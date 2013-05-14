@@ -1,0 +1,147 @@
+FrameBot 
+version 1.0
+Last Update Date: 05/13/2013
+Contact: Qiong Wang at wangqion@msu.edu, RDP Staff at rdpstaff@msu.edu
+
+-----------------------
+   Introduction
+-----------------------
+RDP FrameBot is a frameshift correction and nearest neighbor classification tool for use with high-throughput amplicon sequencing. It uses a dynamic programming algorithm to align each query DNA sequence against a set of target protein sequences, produces frameshift-corrected protein and DNA sequences and an optimal global or local protein alignment. It also helps filter out non-target reads. The online version of FrameBot is available on http://fungene.cme.msu.edu/FunGenePipeline. Read the quick tutorial at http://rdp.cme.msu.edu/tutorials/framebot/RDPtutorial_FRAMEBOT.html before you start. The source code, example files and reference set are available on http://sourceforge.net/projects/rdpframebot/.
+
+CITATION:
+Qiong Wang, John F. Quensen, Jordan A. Fish, Tae Kwon Lee, Yanni Sun, James M. Tiedje and James. R. Cole.  Ecological distribution of nifH genes in four terrestrial climatic zones explored with targeted metagenomics using FrameBot, a new informatics tool. In Preparation.
+
+Copyright 2012 Ribosomal Database Project
+This project is distributed under the terms of the GNU GPLv3
+
+
+-----------------------
+   Directories
+-----------------------
+sourcecode/      - The source code and compiled FrameBot.jar files
+refset/   - The reference sets for specific genes (some might only cover a partial region)
+jars/     - Compiled version FrameBot.jar and the dependent jar libraries
+matrices/ - The protein scoring matrices, blosum62.txt and blosum62_metric.txt
+examples/ - Contains example reference sequence and query sequence files
+
+-----------------------
+   How to Build FrameBot
+-----------------------
+The directory "sourcecode" contains pre-compiled FrameBot.jar in the subdirectory "dist" along with the source code, build.xml and the FrameBot.jar in the subdirectory "dist". If you need to rebuild the program from a terminal, go to the directory "sourcecode" and type "ant" command to build the project. The output files will be stored in the directory "dist". 
+
+-----------------------
+   How to Run FrameBot
+-----------------------
+
+1. Reference set preparation
+The refset directory is preloaded with reference sets for a list of genes. If not found, provide your own set of reference sequences representative of the gene of interest (http://fungene.cme.msu.edu is a good resource). The reference set contains protein or DNA representative sequences of the gene target and should be compiled to have a good coverage of diversity of the gene family. FrameBot is significantly more accurate when the nearest target protein sequence (from the reference set) is at least 50% identical to the query read. Running FrameBot is computationally intensive in no-metric-search mode because it performs all-against-all comparisons between query DNA and the target protein sequences. Therefore we recommend limiting your reference set to 200 protein sequences for no-metric-search mode. The index metic-search mode gains more than 10-fold speedup by reducing the number of comparisons (see FrameBot citation). A larger DNA reference set can be used. 
+
+
+2. Building index for metric indexed search 
+Skip this step if you use no-metric-search mode for step 3.
+This step builds an index file based on the input DNA sequences using global pairwise alignment mode. The parameters and metric scoring matrix are also stored in the index file. The reference DNA sequences should cover the exact same protein-coding region. 
+
+usage: FramebotIndex [options] <nucl seed file> <out index file>
+[Required]
+One DNA reference fasta file, and output index file are required. 
+
+[Options]
+ -e,--gap-ext-penalty <arg>      gap extension penalty. Default is -4
+ -f,--frameshift-penalty <arg>   frameshift penalty. Default is -10
+ -g,--gap-open-penalty <arg>     gap opening penalty. Default is -13
+ -m,--max-radius <arg>           maximum radius for metric-search ONLY, range [1-2147483647]>, default is
+                                 Integer.MAX_VALUE: 2147483647
+ -t,--transl-table <arg>         Protein translation table to use (integer based on ncbi's translation tables,
+                                 default=11 bacteria/archaea)
+ -x,--scoring-matrix <arg>       the metric protein scoring matrix. Default is blosum62_metric.txt from Weijia Xu's
+                                 thesis: On Integrating Biological Sequence Analysis with Metric Distance
+
+[Example command from a terminal]
+java -jar /PATH/dist/FrameBot.jar index example/nifH_test_refseq_nucl.fa nifH_test.index
+
+
+3. Frameshift correction and nearest neighbor assignment
+The is the main step to run frameshift correction. It produces frameshift-corrected protein and DNA sequences and an optimal global or local protein alignment. The nearest matching sequences in the pairwise alignment can be used as the nearest neighbor assignment. Any query sequence that does not satisfy the minimum length and protein identity is considered as non-target read and put in the failed output files. 
+
+usage: FramebotMain [options] <seed or index file> <query file>
+
+[Required]
+One protein reference fasta file or index file, and one DNA query fasta file are required. 
+
+[Options]
+ -a,--alignment-mode <arg>       Alignment mode for no-metric-search ONLY: glocal, local or global (default = glocal)
+ -e,--gap-ext-penalty <arg>      gap extension penalty for no-metric-search ONLY. Default is -1
+ -f,--frameshift-penalty <arg>   frameshift penalty for no-metric-search ONLY. Default is -10
+ -g,--gap-open-penalty <arg>     gap opening penalty for no-metric-search ONLY. Default is -10
+ -i,--identity-cutoff <arg>      Percent identity cutoff [0-1] (default = .4)
+ -l,--length-cutoff <arg>        Length cutoff in number of amino acids (default = 80)
+ -m,--max-radius <arg>           maximum radius for metric-search ONLY, range [1-2147483647], default uses the maxRadius
+                                 specified in the index file
+ -N,--no-metric-search           Disable metric search (provide fasta file of seeds instead of index file)
+ -o,--result-stem <arg>          Result file name stem (default=stem of query nucl file)
+ -q,--quality-file <arg>         Sequence quality data
+ -t,--transl-table <arg>         Protein translation table to use (integer based on ncbi's translation tables,
+                                 default=11 bacteria/archaea)
+ -x,--scoring-matrix <arg>       the protein scoring matrix for no-metric-search ONLY. Default is Blosum62
+
+[Note]
+The metric indexed search uses global alignment mode and the parameters embedded in the index file. 
+This step produces six output files:
+_framebot.txt - the alignment to the nearest match satisfying the minimum length and protein identity cutoff.
+_nucl_corr.fasta and all_seqs_derep_prot_corr.fasta - the frameshift-corrected nucleotide and protein sequences satisfying the minimum length and protein identity cutoff. 
+_failed_framebot.txt - the alignment to the nearest match that failed the minimum length and protein identity cutoff.
+_nucl_failed.fasta - fasta file containing the nucleotide sequences that failed the minimum length and protein identity cutoff.
+
+
+[Example command from a terminal]
+java -jar /PATH/dist/FrameBot.jar framebot -N -o nifH_test example/nifH_test_refseq_prot.fa example/nifH_test_query.fa
+
+java -jar /PATH/dist/FrameBot.jar framebot -o nifH_test example/nifH_test.index example/nifH_test_query.fa
+
+
+3. Miscellaneous help tool -- FrameBot statistics
+The output _framebot.txt file contains the detailed pairwise protein alignment for each sequence. This tool generates a few type of statistics outputs that can be useful as input for third party tools, or spotting problems in the query or reference set. For example, the matrix output is equivalent to a data matrix that can be used in R ordination analysis (see FrameBot publication). IF the hist output showes large portion of query sequences shared less than 50% to the reference sequences, it indicates a broader reference set is needed.
+
+usage: GetFrameBotStatMain [options] <FrameBot Alignment file or Dir> <out file>
+
+[Required]
+One FrameBot pairwise alignment file or a directory and an output file are required.
+
+[Options]
+ -d,--subject-description <arg>   the description of the reference seq, tab-delimited file
+ -i,--id-mapping <arg>            Id mapping file. Output from Dereplicator
+                                  (http://fungene.cme.msu.edu/FunGenePipeline/derep/form.spr).
+ -s,--sample-mapping <arg>        Sample mapping file. Output from Dereplicator
+                                  (http://fungene.cme.msu.edu/FunGenePipeline/derep/form.spr).
+ -t,--stat-type <arg>             stat | hist | summary | matrix | subset
+                                  stat ouptuts the # of seqs passed FrameBot, # of frameshifts for each sample
+                                  hist outputs a nearest match refseq, description and # of seqs close to the refseq at
+                                  different identity% ranges
+                                  summary outputs a list of subject(refseq), description and  # of seqs close to the subject
+                                  matrix outputs the number of sequences to the nearest match. The format is similar to
+                                  a data matrix used for R analysis
+                                  subset outputs the number of sequences to the nearest match for only sequence IDs in
+                                  sample mapping file
+
+[Example command from a terminal]
+java -cp /PATH/dist/FrameBot.jar edu.msu.cme.rdp.framebot.stat.GetFrameBotStatMain -t matrix -s example/samples.txt example/nifH_test_framebot.txt  nifH_test_stat.txt
+
+
+4. Miscellaneous help tool -- random sequence selection
+This tool randomly selects a subset of sequence IDs from the sample Mapping file. Can specify the number of sequences to be selected, or by default select the smallest size of all the samples. The resulting subset sampleMapping file can then be used by GetFrameBotStatMain to generate a data matrix for R analysis.
+
+usage: RdmSelectSampleMapping [options] <sampleMapping> <outfile>
+
+[Required]
+A sampleMapping file and out file are required.
+
+[Options]
+ -n,--num-selection <arg>     number of sequence IDs for each sample. Default is the smallest sample size
+ -x,--exclude-samples <arg>   list of sample names to be excluded from selection
+
+[Example command from a terminal]
+java -cp /PATH/dist/FrameBot.jar edu.msu.cme.rdp.framebot.stat.RdmSelectSampleMapping -n 20 -x example/exclude.txt  example/samples.txt subsetSamples.txt
+
+
+
+
