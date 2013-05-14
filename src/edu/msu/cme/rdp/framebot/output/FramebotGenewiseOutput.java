@@ -28,6 +28,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.PrintStream;
+import java.text.DecimalFormat;
 import org.apache.commons.lang.StringUtils;
 
 /**
@@ -37,6 +38,7 @@ import org.apache.commons.lang.StringUtils;
 public class FramebotGenewiseOutput {
 
     private static final int printWidth = 60;
+    private static final DecimalFormat format = new DecimalFormat("0.000");
 
     private PrintStream out;
 
@@ -106,7 +108,7 @@ public class FramebotGenewiseOutput {
                 result.getAlignedQuery().getSeqName() + "\t" +
                 result.getCorrectedNucl().getSeqString().length() + "\t" +
                 result.getAlignedQuery().getSeqString().length() + "\t" +
-                (int)Math.round(result.getPercentIdent() * 100) + "\t" +
+                format.format(result.getPercentIdent()*100) + "\t" +
                 result.getFrameScore().getMaxScore() + "\t" +
                 result.getFrameshifts() + "\t" +
                 reversed);

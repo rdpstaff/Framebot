@@ -37,8 +37,8 @@ public class FramebotMain {
         options.addOption("q", "quality-file", true, "Sequence quality data");
         options.addOption("m", "max-radius", true, "maximum radius for metric-search ONLY, range [1-" + Integer.MAX_VALUE + "], default uses the maxRadius specified in the index file");
         options.addOption("x", "scoring-matrix", true, "the protein scoring matrix for no-metric-search ONLY. Default is Blosum62");
-        options.addOption("g", "gap-open-penalty", true, "gap opening penalty for no-metric-search ONLY. Default is " + ScoringMatrix.DEFAULT_GAP_EXT_PENALTY);
-        options.addOption("e", "gap-ext-penalty", true, "gap extension penalty for no-metric-search ONLY. Default is " + ScoringMatrix.DEFAULT_GAP_OPEN_PEALTY);
+        options.addOption("g", "gap-open-penalty", true, "gap opening penalty for no-metric-search ONLY. Default is " + ScoringMatrix.DEFAULT_GAP_OPEN_PEALTY);
+        options.addOption("e", "gap-ext-penalty", true, "gap extension penalty for no-metric-search ONLY. Default is " + ScoringMatrix.DEFAULT_GAP_EXT_PENALTY);
         options.addOption("f", "frameshift-penalty", true, "frameshift penalty for no-metric-search ONLY. Default is " + ScoringMatrix.DEFAULT_FRAME_SHIFT_PENALTY);
         
         options.addOption("t", "transl-table", true, "Protein translation table to use (integer based on ncbi's translation tables, default=11 bacteria/archaea)");

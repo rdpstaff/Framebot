@@ -201,7 +201,7 @@ public class GetFrameBotStatMain {
                 identityBin = new int[21];
                 identityMap.put(stat.subjectID, identityBin);
             }
-            int binIndex = stat.identity/5;
+            int binIndex = (int)Math.round(stat.identity)/5;
             identityBin[binIndex] += mappingCount;
 
         }
@@ -268,11 +268,12 @@ public class GetFrameBotStatMain {
             }else {
                 alignLenthMap.put(stat.alignLen, mappingCount + existingFrameshift.intValue() );
             }
-            Integer existingIdentity = identityMap.get(stat.identity);
+            int rounded_identity = (int)Math.round(stat.identity);
+            Integer existingIdentity = identityMap.get(rounded_identity);
             if ( existingIdentity == null){
-                identityMap.put(stat.identity, mappingCount );
+                identityMap.put( rounded_identity, mappingCount );
             }else {
-                identityMap.put(stat.identity, mappingCount + existingIdentity.intValue() );
+                identityMap.put(rounded_identity, mappingCount + existingIdentity.intValue() );
             }
         }
         iterator.close();

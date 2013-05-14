@@ -4,41 +4,38 @@
  */
 package edu.msu.cme.rdp.framebot.stat;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.util.Iterator;
-import java.util.Scanner;
+import java.io.*;
 
 /**
  *
  * @author wangqion
  */
-public class FrameBotStatIterator implements Iterator{
-    private Scanner scanner;
+public class FrameBotStatIterator {
+    private FrameBotReaderCore core;
     
-    public FrameBotStatIterator(File framebotResult) throws FileNotFoundException{
-        scanner = new Scanner(framebotResult).useDelimiter(">");
+    public FrameBotStatIterator(File infile) throws FileNotFoundException, IOException{
+        InputStreamReader is = new InputStreamReader(new FileInputStream(infile));
+        char firstChar = (char) is.read();
+        if ( firstChar == '>'){
+            is.close();
+            core = new FrameBotAlignOutputReader(infile);
+        }else {
+            is.close();
+            core = new FrameBotStatLineReader(infile);
+        }
     }
     
     public boolean hasNext(){
-        return scanner.hasNext();
+        return core.hasNext();
     }
     
     public FrameBotStat next(){
-        String[] statline = scanner.next().split("\n");
-        // the second line
-        String[] tokens = statline[1].trim().split("\\t");
-        return new FrameBotStat(tokens[1], tokens[2], Integer.parseInt(tokens[3]), 
-                Integer.parseInt(tokens[4]),Integer.parseInt(tokens[5]), 
-                Integer.parseInt(tokens[6]), Integer.parseInt(tokens[7]), Boolean.parseBoolean(tokens[8]));
+        return core.next();
     }
     
-    public void remove(){
-        throw new UnsupportedOperationException();
-    }
     
     public void close(){
-        scanner.close();
+        core.close();
     }
     
 }

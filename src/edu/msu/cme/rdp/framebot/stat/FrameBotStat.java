@@ -13,12 +13,12 @@ public class FrameBotStat {
     String queryID;
     int nuclLen;
     int alignLen;
-    int identity;
+    double identity;
     int score;
     int frameshifts;
     boolean reversed;
     
-    public FrameBotStat(String subjectID, String queryID, int nuclLen, int alignLen, int identity, int score, int frameshifts, boolean reversed){
+    public FrameBotStat(String subjectID, String queryID, int nuclLen, int alignLen, double identity, int score, int frameshifts, boolean reversed){
         this.subjectID = subjectID;
         this.queryID = queryID;
         this.nuclLen = nuclLen;
@@ -41,7 +41,7 @@ public class FrameBotStat {
     public int getAlignLen(){
         return alignLen;
     }
-    public int getIdentity(){
+    public double getIdentity(){
         return identity;
     }
     public int getScore(){
