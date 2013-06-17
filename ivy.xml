@@ -1,0 +1,7 @@
+<ivy-module version="2.0">
+    <info organisation="edu.cme.rdp" module="framebot"/>
+    <dependencies>
+		<dependency org="commons-cli" name="commons-cli" rev="1.2"/>
+		<dependency org="commons-lang" name="commons-lang" rev="2.6"/>
+    </dependencies>
+</ivy-module>

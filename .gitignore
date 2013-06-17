@@ -3,3 +3,6 @@ build
 dist
 *~
 #*#
+*tmp*
+lib/
+private/

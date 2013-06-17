@@ -208,7 +208,7 @@ public class FramebotIndex {
 
     private FramebotSearchResult getDistance(Sequence nuclQuery, int seedId, int numComparisons, ScoringMatrix simMatrix) {
         Sequence protSeed = seedSeqs[seedId];
-        FramebotResult result = FramebotCore.processSequence(nuclQuery, protSeed, dontAllowInitiators, translTable, mode, simMatrix);
+        FramebotResult result = FramebotCore.processSequence(nuclQuery, protSeed, dontAllowInitiators, translTable, AlignmentMode.glocal, simMatrix);
 
         int dist = Math.abs(result.getFrameScore().getMaxScore());
         return new FramebotSearchResult(protSeed.getSeqName(), seedId, result, dist, seedId >= seedCount, numComparisons);
