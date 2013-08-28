@@ -33,7 +33,7 @@ public class FramebotMain {
         options.addOption("N", "no-metric-search", false, "Disable metric search (provide fasta file of seeds instead of index file)");
         options.addOption("i", "identity-cutoff", true, "Percent identity cutoff [0-1] (default = .4)");
         options.addOption("l", "length-cutoff", true, "Length cutoff in number of amino acids (default = 80)");
-        options.addOption("a", "alignment-mode", true, "Alignment mode for no-metric-search ONLY: glocal, local or global (default = glocal)");
+        options.addOption("a", "alignment-mode", true, "Alignment mode: glocal, local or global (default = glocal)");
         options.addOption("q", "quality-file", true, "Sequence quality data");
         options.addOption("m", "max-radius", true, "maximum radius for metric-search ONLY, range [1-" + Integer.MAX_VALUE + "], default uses the maxRadius specified in the index file");
         options.addOption("x", "scoring-matrix", true, "the protein scoring matrix for no-metric-search ONLY. Default is Blosum62");
@@ -274,7 +274,7 @@ public class FramebotMain {
         try {
             
             if (metricSearch) {
-                FramebotIndex index = FramebotIndex.readExternalIndex(indexOrSeedFile);
+                FramebotIndex index = FramebotIndex.readExternalIndex(indexOrSeedFile, mode);
                 if ( maxRadius == 0){
                     maxRadius = index.getMaxRadius();
                 }

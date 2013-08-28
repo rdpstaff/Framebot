@@ -35,7 +35,7 @@ public class GetFrameBotMatchMatrix {
      * @param sampleMapping
      * @throws IOException
      */
-    public static void getFramebotMatrix(File framebotResult, String idMapping, String sampleMapping, String outFile) throws IOException{
+    public static void getFramebotMatrix(File framebotResult, String idMapping, String sampleMapping, String outFile, double identity) throws IOException{
         HashMap<String, HashSet<String>> sampleMap = SampleMappingReader.getSampleMapping(sampleMapping);
         HashMap<String, HashMap> countMap = IdMappingReader.getIDCount(idMapping, sampleMap);
         BufferedWriter outWriter = new BufferedWriter(new FileWriter(new File(outFile)));
@@ -43,7 +43,7 @@ public class GetFrameBotMatchMatrix {
         HashMap<String, HashMap<Match, Float>> matrixMap = new HashMap<String, HashMap<Match, Float>>();
         if ( framebotResult.isDirectory()){
             for ( File child : framebotResult.listFiles()){
-                HashMap<String, Match> matchResultMap = getMatchMap(child);
+                HashMap<String, Match> matchResultMap = getMatchMap(child, identity);
                 if ( sampleMap == null){
                     matrixMap.put(GetFrameBotStatMain.DEFAULT_SAMPLE, getOneFramebotMatrix(matchResultMap, countMap.get(GetFrameBotStatMain.DEFAULT_SAMPLE)));
                 }else {
@@ -53,7 +53,7 @@ public class GetFrameBotMatchMatrix {
                 }
             }
         }else {
-            HashMap<String, Match> matchResultMap = getMatchMap(framebotResult);
+            HashMap<String, Match> matchResultMap = getMatchMap(framebotResult, identity);
             if ( sampleMap == null){
                 matrixMap.put(GetFrameBotStatMain.DEFAULT_SAMPLE,getOneFramebotMatrix(matchResultMap, countMap.get(GetFrameBotStatMain.DEFAULT_SAMPLE)));
             }else {               
@@ -93,29 +93,35 @@ public class GetFrameBotMatchMatrix {
     
     private static HashMap<Match, Float> getOneFramebotMatrix(HashMap<String, Match> matchResultMap, HashMap<String, Integer> countMap ) throws IOException{
         HashMap<Match, Float> subjectMap = new HashMap<Match, Float>();
-        
-        for ( Map.Entry entry : matchResultMap.entrySet()){
+       	Set<String> idSet = new HashSet<String>();
+	idSet.addAll( matchResultMap.keySet()); 
+	if ( countMap != null){
+            idSet.retainAll(countMap.keySet());
+	}
+
+        for ( String id: idSet) { 
             int mappingCount = 1;
-            if ( countMap != null && countMap.get(entry.getKey() )!= null){
-                mappingCount = countMap.get(entry.getKey());
+            if ( countMap != null) {
+                mappingCount = countMap.get(id);
             }
             // subject
-            Float existingSubject = subjectMap.get(entry.getValue());
+            Float existingSubject = subjectMap.get(matchResultMap.get(id));
             if ( existingSubject == null){
-                subjectMap.put((Match)entry.getValue(), (float)mappingCount );
+                subjectMap.put(matchResultMap.get(id), (float)mappingCount );
             }else {
-                subjectMap.put((Match)entry.getValue(), (float)(mappingCount + existingSubject.intValue()) );
+                subjectMap.put(matchResultMap.get(id), (float)(mappingCount + existingSubject.intValue()) );
             }
         }  
         return subjectMap;
     }
    
-    private static HashMap<String, Match> getMatchMap(File framebotResult ) throws IOException{
+    private static HashMap<String, Match> getMatchMap(File framebotResult, double identity ) throws IOException{
         HashMap<String, Match> matchMap = new HashMap<String, Match>();
         HashMap<String, Match> subjectMap = new HashMap<String, Match>();
-        FrameBotStatIterator iterator = new FrameBotStatIterator(framebotResult);
+        FrameBotStatIterator iterator = new FrameBotStatIterator(framebotResult, true);
         while (iterator.hasNext()){
             FrameBotStat stat = iterator.next();
+            if ( stat.getIdentity() < identity) continue;
             Match match = subjectMap.get(stat.subjectID);
             if ( match == null ){
                 match = new Match(stat.subjectID);
@@ -139,11 +145,11 @@ public class GetFrameBotMatchMatrix {
      * @param sampleMapping
      * @throws IOException
      */
-     public static void getSubsetMatrix(File framebotResult, String idMapping, String subsetSampleMapping, String outFile) throws IOException{
+     public static void getSubsetMatrix(File framebotResult, String idMapping, String subsetSampleMapping, String outFile, double identity) throws IOException{
         HashMap<String, HashSet<String>> sampleMap = SampleMappingReader.getSampleMapping(subsetSampleMapping);
        
         BufferedWriter outWriter = new BufferedWriter(new FileWriter(new File(outFile)));
-        HashMap<String, Match> matchResultMap = getMatchMap(framebotResult);
+        HashMap<String, Match> matchResultMap = getMatchMap(framebotResult, identity);
         HashMap<String, HashMap<Match, Float>> matrixMap = new HashMap<String, HashMap<Match, Float>>();
        
         if ( idMapping == null){

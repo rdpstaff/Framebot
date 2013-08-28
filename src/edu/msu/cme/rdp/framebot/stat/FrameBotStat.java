@@ -17,6 +17,7 @@ public class FrameBotStat {
     int score;
     int frameshifts;
     boolean reversed;
+    String[] alignment = null;
     
     public FrameBotStat(String subjectID, String queryID, int nuclLen, int alignLen, double identity, int score, int frameshifts, boolean reversed){
         this.subjectID = subjectID;
@@ -29,6 +30,11 @@ public class FrameBotStat {
         this.reversed = reversed;
     }
     
+    public FrameBotStat(String subjectID, String queryID, int nuclLen, int alignLen, double identity, int score, int frameshifts, boolean reversed, String[] alignment){
+        this( subjectID,  queryID, nuclLen, alignLen, identity, score, frameshifts, reversed);
+        this.alignment = alignment;
+    }
+        
     public String getQueryID(){
         return queryID;
     }
@@ -53,4 +59,13 @@ public class FrameBotStat {
     public boolean isReversed(){
         return reversed;
     }
+    
+    public String[] getAlignment(){
+        return alignment;
+    }
+    
+    public String statToString(){
+        return ("STATS\t" + subjectID + "\t" + queryID + "\t" + nuclLen + "\t" + alignLen +"\t" + identity + "\t" + score + "\t" + frameshifts +"\t" + reversed);
+    }
+    
 }

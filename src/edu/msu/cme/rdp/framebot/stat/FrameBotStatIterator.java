@@ -13,12 +13,12 @@ import java.io.*;
 public class FrameBotStatIterator {
     private FrameBotReaderCore core;
     
-    public FrameBotStatIterator(File infile) throws FileNotFoundException, IOException{
+    public FrameBotStatIterator(File infile, boolean ignoreAlignment) throws FileNotFoundException, IOException{
         InputStreamReader is = new InputStreamReader(new FileInputStream(infile));
         char firstChar = (char) is.read();
         if ( firstChar == '>'){
             is.close();
-            core = new FrameBotAlignOutputReader(infile);
+            core = new FrameBotAlignOutputReader(infile, ignoreAlignment);
         }else {
             is.close();
             core = new FrameBotStatLineReader(infile);

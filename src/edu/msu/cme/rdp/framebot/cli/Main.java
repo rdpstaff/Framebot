@@ -18,6 +18,8 @@
 package edu.msu.cme.rdp.framebot.cli;
 
 import edu.msu.cme.rdp.framebot.index.FramebotIndex;
+import edu.msu.cme.rdp.framebot.stat.GetFrameBotStatMain;
+import edu.msu.cme.rdp.framebot.stat.RdmSelectSampleMapping;
 import java.util.Arrays;
 
 /**
@@ -30,6 +32,8 @@ public class Main {
         String usage = "USAGE: Main <subcommand> <subcommand args ...>" +
                 "\n\tframebot      - run framebot" +
                 "\n\tindex         - build an index" +
+                "\n\tstat          - convert framebot output files to different output formats" +
+                "\n\trdmselect     - randomly selects a subset of sequence IDs from the sample Mapping file" +
                 "\n\ttranslate     - translate nucleotide sequences to protein (no frameshift correction) " +
                 "\n\tall-translate - translate nucleotide sequences to protein, all reading frames (no frameshift correction)";
         if(args.length == 0 ) {
@@ -48,6 +52,10 @@ public class Main {
             Translation.main(newArgs);
         } else if(cmd.equals("all-translate")) {
             AllTranslate.main(newArgs);
+        } else if(cmd.equals("stat")) {
+            GetFrameBotStatMain.main(newArgs);
+        } else if(cmd.equals("rdmselect")) {
+            RdmSelectSampleMapping.main(newArgs);
         } else {
             System.err.println("ERROR: " + "wrong subcommand");
             System.err.println(usage);

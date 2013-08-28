@@ -1,6 +1,18 @@
 /*
- * To change this template, choose Tools | Templates
- * and open the template in the editor.
+ * Copyright (C) 2012 Michigan State University <rdpstaff at msu.edu>
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 package edu.msu.cme.rdp.framebot.index;
 
@@ -181,10 +193,13 @@ public class FramebotIndex {
         return ret;
     }
 
-    public static FramebotIndex readExternalIndex(File externalIndexFile) throws IOException {
+    public static FramebotIndex readExternalIndex(File externalIndexFile, AlignmentMode mode) throws IOException {
         try {
             InputStream is = new GZIPInputStream(new BufferedInputStream(new FileInputStream(externalIndexFile)));
             FramebotIndex ret = (FramebotIndex) JAXBContext.newInstance(FramebotIndex.class).createUnmarshaller().unmarshal(is);
+                 
+            // Alignment mode to do FrameBot
+            ret.mode = mode;
             is.close();
             
             return ret;
@@ -208,7 +223,7 @@ public class FramebotIndex {
 
     private FramebotSearchResult getDistance(Sequence nuclQuery, int seedId, int numComparisons, ScoringMatrix simMatrix) {
         Sequence protSeed = seedSeqs[seedId];
-        FramebotResult result = FramebotCore.processSequence(nuclQuery, protSeed, dontAllowInitiators, translTable, AlignmentMode.glocal, simMatrix);
+        FramebotResult result = FramebotCore.processSequence(nuclQuery, protSeed, dontAllowInitiators, translTable, mode, simMatrix);
 
         int dist = Math.abs(result.getFrameScore().getMaxScore());
         return new FramebotSearchResult(protSeed.getSeqName(), seedId, result, dist, seedId >= seedCount, numComparisons);

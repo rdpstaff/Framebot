@@ -20,11 +20,13 @@ public class GetFrameBotStatMain {
     private static final String SAMPLE_MAPPING_SHORT_OPT = "s";
     private static final String STAT_SHORT_OPT = "t";
     private static final String DESCRIPTION_SHORT_OPT = "d";
+    private static final String IDENTITY_SHORT_OPT = "e";
     
     private static final String ID_MAPPING_LONG_OPT = "id-mapping";
     private static final String SAMPLE_MAPPING_LONG_OPT = "sample-mapping";
     private static final String STAT_LONG_OPT = "stat-type";
     private static final String DESCRIPTION_LONG_OPT = "subject-description";
+    private static final String IDENTITY_LONG_OPT = "identity";
     
    
     private static final String STAT_DESC =  "stat | hist | summary | matrix | subset "
@@ -43,6 +45,7 @@ public class GetFrameBotStatMain {
         options.addOption(new Option(SAMPLE_MAPPING_SHORT_OPT, SAMPLE_MAPPING_LONG_OPT, true, "Sample mapping file. Output from Dereplicator (http://fungene.cme.msu.edu/FunGenePipeline/derep/form.spr)."));
         options.addOption(new Option(STAT_SHORT_OPT, STAT_LONG_OPT, true, STAT_DESC));
         options.addOption(new Option(DESCRIPTION_SHORT_OPT, DESCRIPTION_LONG_OPT, true, "the description of the reference seq, tab-delimited file"));
+        options.addOption(new Option(IDENTITY_SHORT_OPT, IDENTITY_LONG_OPT, true, "the minimum protein identity, default is 0, range [0-100]"));
     }
 
     public static class Count{
@@ -76,7 +79,6 @@ public class GetFrameBotStatMain {
         while ((line=reader.readLine()) != null){
             String[] values = line.split("\\t");
             descMap.put(values[0], values[1]);
-            System.err.println("put " + values[0] + "*" + values[1]);
         }
         reader.close();
         return descMap;
@@ -89,14 +91,10 @@ public class GetFrameBotStatMain {
      * @param sampleMapping
      * @throws IOException
      */
-    public static void process(File framebotResult, String idMapping, String sampleMapping, String outFile, String type ) throws IOException{
+    public static void process(File framebotResult, String idMapping, String sampleMapping, String outFile, String type, double identity ) throws IOException{
         HashMap<String, HashSet<String>> sampleMap = SampleMappingReader.getSampleMapping(sampleMapping);
         HashMap<String, HashMap> countMap;
-        if ( type.equalsIgnoreCase("stat") || type.equalsIgnoreCase("summary")){
-            countMap = IdMappingReader.getIDCount(idMapping, sampleMap);
-        }else {
-            countMap = IdMappingReader.getIDMapping(idMapping, sampleMap); 
-        }
+        countMap = IdMappingReader.getIDCount(idMapping, sampleMap);
         
         BufferedWriter outWriter = new BufferedWriter(new FileWriter(new File(outFile)));
         if( type.equalsIgnoreCase("stat")){
@@ -105,19 +103,19 @@ public class GetFrameBotStatMain {
         if ( framebotResult.isDirectory()){
             for ( File child : framebotResult.listFiles()){
                 if ( sampleMap == null){
-                    outWriter.write(processOneFramebot(child, countMap.get(DEFAULT_SAMPLE), DEFAULT_SAMPLE, type)+"\n");
+                    outWriter.write(processOneFramebot(child, countMap.get(DEFAULT_SAMPLE), DEFAULT_SAMPLE, type, identity)+"\n");
                 }else {
                     for ( String sample: sampleMap.keySet()){
-                        outWriter.write(processOneFramebot(child, countMap.get(sample), sample, type) +"\n");
+                        outWriter.write(processOneFramebot(child, countMap.get(sample), sample, type, identity) +"\n");
                     }
                 }
             }
         }else {
             if ( sampleMap == null){
-                outWriter.write(processOneFramebot(framebotResult, countMap.get(DEFAULT_SAMPLE), DEFAULT_SAMPLE, type)+"\n");
+                outWriter.write(processOneFramebot(framebotResult, countMap.get(DEFAULT_SAMPLE), DEFAULT_SAMPLE, type, identity)+"\n");
             }else {
                 for ( String sample: sampleMap.keySet()){
-                    outWriter.write(processOneFramebot(framebotResult, countMap.get(sample), sample, type) +"\n");
+                    outWriter.write(processOneFramebot(framebotResult, countMap.get(sample), sample, type, identity) +"\n");
                 }
             }
             
@@ -125,13 +123,13 @@ public class GetFrameBotStatMain {
         outWriter.close();
     }
   
-    private static String processOneFramebot(File framebotResult, HashMap countMap, String sampleName, String type) throws IOException{
+    private static String processOneFramebot(File framebotResult, HashMap countMap, String sampleName, String type, double identity) throws IOException{
         if( type.equalsIgnoreCase("stat")){
-            return getOneFramebotStat(framebotResult, countMap, sampleName);
+            return getOneFramebotStat(framebotResult, countMap, sampleName, identity);
         }else if( type.equalsIgnoreCase("hist")){
-            return getOneFramebotHist(framebotResult, countMap, sampleName);
+            return getOneFramebotHist(framebotResult, countMap, sampleName, identity);
         }else if( type.equalsIgnoreCase("summary")){
-            return getOneFramebotSummary(framebotResult, countMap, sampleName);
+            return getOneFramebotSummary(framebotResult, countMap, sampleName, identity);
         }
         return null;
     }
@@ -142,15 +140,21 @@ public class GetFrameBotStatMain {
      * @param frambotResult file
      * @param countMap
      */
-    private static String getOneFramebotStat(File framebotResult, HashMap<String, Integer> countMap, String sampleName) throws IOException{
+    private static String getOneFramebotStat(File framebotResult, HashMap<String, Integer> countMap, String sampleName, double identity) throws IOException{
         HashMap<Integer, Integer> frameshiftMap = new HashMap<Integer, Integer>();
-        FrameBotStatIterator iterator = new FrameBotStatIterator(framebotResult);
+        FrameBotStatIterator iterator = new FrameBotStatIterator(framebotResult, true);
         while (iterator.hasNext()){
             FrameBotStat stat = iterator.next();
+            if ( stat.getIdentity() < identity) continue;
             int mappingCount = 1;
-            if ( countMap != null && countMap.get(stat.queryID)!= null){
-                mappingCount = countMap.get(stat.queryID);
-            }
+            
+            if ( countMap != null) {
+                if ( countMap.get(stat.queryID)!= null ){
+                    mappingCount = countMap.get(stat.queryID);
+                }else {  // not in the mapping, that means we should discard this match
+                    continue;
+                }
+            }     
             Integer existingFrameshift = frameshiftMap.get(stat.frameshifts);
             if ( existingFrameshift == null){
                 frameshiftMap.put(stat.frameshifts, mappingCount );
@@ -182,28 +186,34 @@ public class GetFrameBotStatMain {
      * @param frambotresult
      * @param idMapping
      */
-    private static String getOneFramebotHist(File framebotResult, HashMap<String, Set> countMap, String sampleName) throws IOException{
+    private static String getOneFramebotHist(File framebotResult, HashMap<String, Integer> countMap, String sampleName, double identity) throws IOException{
         HashMap<String, int[]> identityMap = new HashMap<String, int[]>(); // refseq, int[] of bin range
 
         TreeSet<Count> orderedSubjectSet = new TreeSet<Count>(new ResultComparator());
         StringBuilder retval = new StringBuilder();
-
-        FrameBotStatIterator iterator = new FrameBotStatIterator(framebotResult);
+        FrameBotStatIterator iterator = new FrameBotStatIterator(framebotResult, true);
         while (iterator.hasNext()){
             FrameBotStat stat = iterator.next();
-            int mappingCount = 1;
-            if ( countMap != null && countMap.get(stat.queryID)!= null){
-                mappingCount = countMap.get(stat.queryID).size();
+            if ( stat.getIdentity() < identity) {
+                continue;
             }
-            
+            int mappingCount = 1;
+            if ( countMap != null) {
+                if ( countMap.get(stat.queryID)!= null ){
+                    mappingCount = countMap.get(stat.queryID);
+                }else {  // not in the mapping, that means we should discard this match
+                    continue;
+                }
+            }            
             int[] identityBin = identityMap.get(stat.subjectID);
             if ( identityBin == null){  // every 5%
                 identityBin = new int[21];
                 identityMap.put(stat.subjectID, identityBin);
             }
-            int binIndex = (int)Math.round(stat.identity)/5;
+            int binIndex = (int)Math.floor(stat.identity)/5;
+            
             identityBin[binIndex] += mappingCount;
-
+           
         }
         iterator.close();
        
@@ -244,18 +254,28 @@ public class GetFrameBotStatMain {
      * @param framebotResult
      * @param idMapping
      */
-    private static String getOneFramebotSummary(File framebotResult, HashMap<String, Integer> countMap, String sampleName ) throws IOException{
+    private static String getOneFramebotSummary(File framebotResult, HashMap<String, Integer> countMap, String sampleName, double identity) throws IOException{
         HashMap<Integer, Integer> alignLenthMap = new HashMap<Integer, Integer>();
         HashMap<Integer, Integer> identityMap = new HashMap<Integer, Integer>();
         HashMap<String, Integer> subjectMap = new HashMap<String, Integer>();
 
-        FrameBotStatIterator iterator = new FrameBotStatIterator(framebotResult);
+        FrameBotStatIterator iterator = new FrameBotStatIterator(framebotResult, true);
         while (iterator.hasNext()){
             FrameBotStat stat = iterator.next();
+            if ( stat.getIdentity() < identity) {
+                continue;
+            }
             int mappingCount = 1;
             if ( countMap != null && countMap.get(stat.queryID)!= null){
                 mappingCount = countMap.get(stat.queryID);
             }
+            if ( countMap != null) {
+                if ( countMap.get(stat.queryID)!= null ){
+                    mappingCount = countMap.get(stat.queryID);
+                }else {  // not in the mapping, that means we should discard this match
+                    continue;
+                }
+            }     
             Integer existingSubject = subjectMap.get(stat.subjectID);
             if ( existingSubject == null){
                 subjectMap.put(stat.subjectID, mappingCount );
@@ -268,7 +288,7 @@ public class GetFrameBotStatMain {
             }else {
                 alignLenthMap.put(stat.alignLen, mappingCount + existingFrameshift.intValue() );
             }
-            int rounded_identity = (int)Math.round(stat.identity);
+            int rounded_identity = (int)Math.floor(stat.identity);
             Integer existingIdentity = identityMap.get(rounded_identity);
             if ( existingIdentity == null){
                 identityMap.put( rounded_identity, mappingCount );
@@ -307,6 +327,8 @@ public class GetFrameBotStatMain {
         String stat = null;
         String outFile = null;
         String descFile = null;
+        double identity = 0.0;
+        
         try {
             CommandLine line = new PosixParser().parse(options, args);
             if (line.hasOption(ID_MAPPING_SHORT_OPT) ) {
@@ -328,7 +350,13 @@ public class GetFrameBotStatMain {
                 descFile = line.getOptionValue(DESCRIPTION_SHORT_OPT);
                 descMap = readDesc(descFile);
             } 
-            
+            if (line.hasOption(IDENTITY_SHORT_OPT) ) {
+                identity = Double.parseDouble(line.getOptionValue(IDENTITY_SHORT_OPT));
+                if ( identity < 0 || identity > 100) {
+                     throw new IllegalArgumentException("identity cutoff should be in the range of 0 and 100");
+                }
+            } 
+                                
             args = line.getArgs();
             if ( args.length != 2){
                 throw new Exception("Incorrect number of command line arguments");
@@ -343,11 +371,11 @@ public class GetFrameBotStatMain {
         
          
         if ( stat.equals("matrix")){
-            GetFrameBotMatchMatrix.getFramebotMatrix(new File(framebotResult), idMapping, sampleMapping, outFile);
+            GetFrameBotMatchMatrix.getFramebotMatrix(new File(framebotResult), idMapping, sampleMapping, outFile, identity);
         }else if ( stat.equals("subset")){
-            GetFrameBotMatchMatrix.getSubsetMatrix(new File(framebotResult), idMapping, sampleMapping, outFile);
+            GetFrameBotMatchMatrix.getSubsetMatrix(new File(framebotResult), idMapping, sampleMapping, outFile, identity);
         }else {
-            process(new File(framebotResult), idMapping, sampleMapping, outFile, stat);
+            process(new File(framebotResult), idMapping, sampleMapping, outFile, stat, identity);
         }
 
     }

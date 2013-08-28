@@ -25,8 +25,27 @@ public class IdMappingReader {
      */
      public static HashMap getIDCount(String idmapping, HashMap<String, HashSet<String>> sampleMap ) throws IOException {
          HashMap<String, HashMap<String, Integer>> countMap = new HashMap<String, HashMap<String, Integer>>();
-        if ( idmapping == null) return countMap;
-
+        if ( idmapping == null) {
+            if ( sampleMap == null) {
+                return countMap;
+            } else { // if idmapping is null, we should assume seq in sampleMap have one count
+            
+                for ( String sample: sampleMap.keySet()){
+                    Set<String> sample_seqset = sampleMap.get(sample);
+                    HashMap<String, Integer> tmp = countMap.get(sample);
+                    if ( tmp == null){
+                        tmp = new HashMap<String, Integer>();
+                        countMap.put(sample, tmp);
+                    }
+                    for ( String id: sample_seqset){
+                        tmp.put( id, 1);
+                    }
+                    
+                }
+            }
+            return countMap;
+        }
+        
         BufferedReader reader = new BufferedReader(new FileReader(new File(idmapping)));
         String line = null;
 
@@ -59,7 +78,9 @@ public class IdMappingReader {
                         tmp = new HashMap<String, Integer>();
                         countMap.put(sample, tmp);
                     }
-                    tmp.put( ids[0], prev_size - seqset.size());
+                    if ( (prev_size - seqset.size() ) > 0 ){
+                        tmp.put( ids[0], prev_size - seqset.size());
+                    }
                     prev_size = seqset.size();
                 }
             }

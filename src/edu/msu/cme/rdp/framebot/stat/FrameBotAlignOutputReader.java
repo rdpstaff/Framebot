@@ -16,9 +16,11 @@ import java.util.Scanner;
 public class FrameBotAlignOutputReader extends FrameBotReaderCore {
     
     private Scanner scanner;
+    private boolean ignoreAlignment = false ; // default only keep the STAT line, ignore the alignment
     
-    public FrameBotAlignOutputReader(File framebotResult) throws FileNotFoundException{
+    public FrameBotAlignOutputReader(File framebotResult, boolean ignoreAlignment) throws FileNotFoundException{
         scanner = new Scanner(framebotResult).useDelimiter(">");
+        this.ignoreAlignment = ignoreAlignment;
     }
     
     public boolean hasNext(){
@@ -27,8 +29,12 @@ public class FrameBotAlignOutputReader extends FrameBotReaderCore {
     
     public FrameBotStat next(){
         String[] statline = scanner.next().split("\n");
-        // the second line        
-        return getStatLine(statline[1]);
+        // the second line 
+        if ( ignoreAlignment) {
+            return getStatLine(statline[1]);
+        }else {
+            return getAlignment(statline);
+        }
     }
      
     public void close(){
