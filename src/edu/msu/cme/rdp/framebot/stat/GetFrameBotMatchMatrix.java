@@ -94,10 +94,10 @@ public class GetFrameBotMatchMatrix {
     private static HashMap<Match, Float> getOneFramebotMatrix(HashMap<String, Match> matchResultMap, HashMap<String, Integer> countMap ) throws IOException{
         HashMap<Match, Float> subjectMap = new HashMap<Match, Float>();
        	Set<String> idSet = new HashSet<String>();
-	idSet.addAll( matchResultMap.keySet()); 
-	if ( countMap != null){
+        idSet.addAll( matchResultMap.keySet()); 
+        if ( countMap != null){
             idSet.retainAll(countMap.keySet());
-	}
+        }
 
         for ( String id: idSet) { 
             int mappingCount = 1;

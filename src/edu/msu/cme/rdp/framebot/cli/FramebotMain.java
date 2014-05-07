@@ -2,6 +2,7 @@ package edu.msu.cme.rdp.framebot.cli;
 
 import edu.msu.cme.rdp.alignment.AlignmentMode;
 import edu.msu.cme.rdp.alignment.pairwise.ScoringMatrix;
+import edu.msu.cme.rdp.framebot.core.ProteinSeqMatch;
 import edu.msu.cme.rdp.framebot.core.FramebotCore;
 import edu.msu.cme.rdp.framebot.core.FramebotResult;
 import edu.msu.cme.rdp.framebot.index.FramebotIndex;
@@ -16,6 +17,7 @@ import edu.msu.cme.rdp.readseq.readers.SeqReader;
 import edu.msu.cme.rdp.readseq.readers.Sequence;
 import edu.msu.cme.rdp.readseq.utils.IUBUtilities;
 import edu.msu.cme.rdp.readseq.utils.SeqUtils;
+import edu.msu.cme.rdp.readseq.utils.orientation.ProteinWordGenerator;
 import java.io.FileInputStream;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +44,9 @@ public class FramebotMain {
         options.addOption("f", "frameshift-penalty", true, "frameshift penalty for no-metric-search ONLY. Default is " + ScoringMatrix.DEFAULT_FRAME_SHIFT_PENALTY);
         
         options.addOption("t", "transl-table", true, "Protein translation table to use (integer based on ncbi's translation tables, default=11 bacteria/archaea)");
+        options.addOption("w", "word-size", true, "The word size used to find closest protein targets. (default = " + ProteinWordGenerator.WORDSIZE + ", recommended range [3 - 6])");
+        options.addOption("k", "knn", true, "The top k closest protein targets. (default = 10)");
+        options.addOption("P", "no-prefilter", false, "Disable the pre-filtering step for non-metric search.");
     }
 
     private static void framebotItUp(List<Sequence> targetSeqs, File queryFile, File qualFile, OutputCoordinator outputCoordinator, AlignmentMode mode, ScoringMatrix simMatrix, int translTable) throws IOException {
@@ -78,6 +83,65 @@ public class FramebotMain {
                 if (bestResult == null || bestResult.getFrameScore().getMaxScore() < result.getFrameScore().getMaxScore()) {
                     bestResult = result;
                     bestIsReversed = (result == resultReverse);
+                }
+            }
+
+            outputCoordinator.printResult(bestResult, seq, bestIsReversed);
+
+            System.out.println("Processed " + seq.getSeqName() + " in " + (System.currentTimeMillis() - startTime) + " ms");
+            seqCount++;
+        }
+
+        System.out.println("Processed " + seqCount + " sequences in " + (System.currentTimeMillis() - totalTime) + " ms");
+    }
+    
+    /**
+     * This method searches the closest target sequences first using the Seqmatch algorithm with protein sequence, then do frameshift correction against the top k target sequences
+     * @param targetSeqs
+     * @param queryFile
+     * @param qualFile
+     * @param outputCoordinator
+     * @param mode
+     * @param simMatrix
+     * @param translTable
+     * @throws IOException 
+     */
+    private static void framebotItUp_prefilter(List<Sequence> targetSeqs, File queryFile, File qualFile, 
+            OutputCoordinator outputCoordinator, AlignmentMode mode, ScoringMatrix simMatrix, int translTable, int wordSize, int k) throws IOException {
+        SeqReader queryReader;
+
+        if(qualFile != null) {
+            queryReader = new QSeqReader(queryFile, qualFile);
+        } else {
+            queryReader = new SequenceReader(queryFile);
+        }
+
+        Sequence seq;
+        int seqCount = 0;
+        long totalTime = System.currentTimeMillis();                
+        ProteinSeqMatch theObj = new ProteinSeqMatch(targetSeqs, wordSize);            
+
+        while ((seq = queryReader.readNextSequence()) != null) {
+            Sequence reverseComplement = new Sequence(seq.getSeqName(), "", IUBUtilities.reverseComplement(seq.getSeqString()));
+
+            FramebotResult bestResult = null;
+            boolean bestIsReversed = true;
+            
+            long startTime = System.currentTimeMillis();
+            ArrayList<ProteinSeqMatch.BestMatch> topKMatches= theObj.findTopKMatch(seq, k);
+             
+            for (ProteinSeqMatch.BestMatch bestTarget : topKMatches) {
+                FramebotResult result;
+                if ( !bestTarget.isRevComp()){
+                    result = FramebotCore.processSequence(seq, bestTarget.getBestMatch(), true, translTable, mode, simMatrix);
+                } else {
+                    result = FramebotCore.processSequence(reverseComplement, bestTarget.getBestMatch(), true, translTable, mode, simMatrix);
+                }
+
+                //System.err.println(seq.getSeqName() + " target=" + bestTarget.getBestMatch().getSeqName() + " score=" + result.getFrameScore().getMaxScore());
+                if (bestResult == null || bestResult.getFrameScore().getMaxScore() < result.getFrameScore().getMaxScore()) {
+                    bestResult = result;
+                    bestIsReversed = bestTarget.isRevComp();
                 }
             }
 
@@ -138,14 +202,18 @@ public class FramebotMain {
         double identityCutoff = .4;
         String outputStem = null;
         boolean metricSearch = true;
+        boolean usePrefilter = true;
         int maxRadius = 0;
         int translTable = 11;
+        int wordSize = ProteinWordGenerator.WORDSIZE;
+        int k = 10;
         AlignmentMode mode = AlignmentMode.glocal;
         File scoringMatrixFile = null;
         int gapPenalty = ScoringMatrix.DEFAULT_GAP_OPEN_PEALTY;
         int gapExtend = ScoringMatrix.DEFAULT_GAP_EXT_PENALTY;
         int frameshiftPenalty = ScoringMatrix.DEFAULT_FRAME_SHIFT_PENALTY;
         boolean useDefaultMatrixParameter = true; 
+        
 
         File framebotOutput;
         File failedFramebotOutput;
@@ -169,9 +237,12 @@ public class FramebotMain {
             }
             if (line.hasOption("length-cutoff")) {
                 lengthCutoff = Integer.parseInt(line.getOptionValue("length-cutoff"));
-            }
+            }            
             if (line.hasOption("no-metric-search")) {
                 metricSearch = false;
+            }
+            if (line.hasOption("no-prefilter")) {
+                usePrefilter = false;
             }
             if (line.hasOption("scoring-matrix")) {
                 scoringMatrixFile = new File(line.getOptionValue("scoring-matrix"));
@@ -212,7 +283,18 @@ public class FramebotMain {
                     throw new IllegalArgumentException("Only " + AlignmentMode.glocal.name() + " or " + AlignmentMode.local.name() + " or " + AlignmentMode.global.name() + " are allowed for the alignment type");
                 }
             }
-            
+            if (line.hasOption("word-size")) {
+                wordSize = Integer.parseInt(line.getOptionValue("word-size"));
+                if ( wordSize < 3 ){
+                    throw new Exception("Word size must be at least 3");
+                }
+            }
+            if (line.hasOption("knn")) {
+                k = Integer.parseInt(line.getOptionValue("knn"));
+                if ( k < 1 ){
+                    throw new Exception("knn must be at least 1");
+                }
+            }
 
             args = line.getArgs();
 
@@ -295,7 +377,12 @@ public class FramebotMain {
                 }else {
                     scoringMatrix = ScoringMatrix.getDefaultProteinMatrix();
                 }
-                FramebotMain.framebotItUp(targetSeqs, queryFile, qualFile, outputCoordinator, mode, scoringMatrix, translTable);
+                if ( usePrefilter){
+                     FramebotMain.framebotItUp_prefilter(targetSeqs, queryFile, qualFile, outputCoordinator, mode, scoringMatrix, translTable, wordSize, k);
+                } else {
+                    FramebotMain.framebotItUp(targetSeqs, queryFile, qualFile, outputCoordinator, mode, scoringMatrix, translTable);
+                }
+                
             }
         } finally {
             outputCoordinator.close();

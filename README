@@ -29,8 +29,52 @@ ant jar to build jar files.
 The refset directory is preloaded with reference sets for a list of genes. If not found, provide your own set of reference sequences representative of the gene of interest (http://fungene.cme.msu.edu is a good resource). The reference set contains protein or DNA representative sequences of the gene target and should be compiled to have a good coverage of diversity of the gene family. FrameBot is significantly more accurate when the nearest target protein sequence (from the reference set) is at least 50% identical to the query read. Running FrameBot is computationally intensive in no-metric-search mode because it performs all-against-all comparisons between query DNA and the target protein sequences. Therefore we recommend limiting your reference set to 200 protein sequences for no-metric-search mode. The index metic-search mode gains more than 10-fold speedup by reducing the number of comparisons (see FrameBot citation). A larger DNA reference set can be used. 
 
 
-2. Building index for metric indexed search 
-Skip this step if you use no-metric-search mode for step 3.
+2. Frameshift correction and nearest neighbor assignment
+The is the main step to run frameshift correction. It produces frameshift-corrected protein and DNA sequences and an optimal global or local protein alignment. The nearest matching sequences in the pairwise alignment can be used as the nearest neighbor assignment. Any query sequence that does not satisfy the minimum length and protein identity is considered as non-target read and put in the failed output files. 
+
+usage: FramebotMain [options] <seed or index file> <query file>
+
+[Required]
+One protein reference fasta file or index file, and one DNA query fasta file are required. 
+
+[Options]
+ -a,--alignment-mode <arg>       Alignment mode: glocal, local or global (default = glocal)
+ -e,--gap-ext-penalty <arg>      gap extension penalty for no-metric-search ONLY. Default is -1
+ -f,--frameshift-penalty <arg>   frameshift penalty for no-metric-search ONLY. Default is -10
+ -g,--gap-open-penalty <arg>     gap opening penalty for no-metric-search ONLY. Default is -10
+ -i,--identity-cutoff <arg>      Percent identity cutoff [0-1] (default = .4)
+ -k,--knn <arg>                  The top k closest protein targets. (default = 10)
+ -l,--length-cutoff <arg>        Length cutoff in number of amino acids (default = 80)
+ -m,--max-radius <arg>           maximum radius for metric-search ONLY, range [1-2147483647], default uses the maxRadius
+                                 specified in the index file
+ -N,--no-metric-search           Disable metric search (provide fasta file of seeds instead of index file)
+ -o,--result-stem <arg>          Result file name stem (default=stem of query nucl file)
+ -P,--no-prefilter               Disable the pre-filtering step for non-metric search.
+ -q,--quality-file <arg>         Sequence quality data
+ -t,--transl-table <arg>         Protein translation table to use (integer based on ncbi's translation tables,
+                                 default=11 bacteria/archaea)
+ -w,--word-size <arg>            The word size used to find closest protein targets. (default = 4, recommended range [3 - 6])
+ -x,--scoring-matrix <arg>       the protein scoring matrix for no-metric-search ONLY. Default is Blosum62
+
+
+[Note]
+FrameBot uses a kmer pre-filtering heuristic for no-metric-search. This pre-filtering may increase the speed by one to two orders of magnitude.
+Using this heuristic may cause FrameBot to return a different equally high-scoring (or occasionally almost as high) reference sequence. 
+Use option "-P" to disable the pre-filtering if necessary. To use metric-search, see step 3. 
+ 
+This step produces six output files:
+_framebot.txt - the alignment to the nearest match satisfying the minimum length and protein identity cutoff.
+_nucl_corr.fasta and all_seqs_derep_prot_corr.fasta - the frameshift-corrected nucleotide and protein sequences satisfying the minimum length and protein identity cutoff. 
+_failed_framebot.txt - the alignment to the nearest match that failed the minimum length and protein identity cutoff.
+_nucl_failed.fasta - fasta file containing the nucleotide sequences that failed the minimum length and protein identity cutoff.
+
+
+[Example command from a terminal]
+java -jar /PATH/dist/FrameBot.jar framebot -N -o nifH_test example/nifH_test_refseq_prot.fa example/nifH_test_query.fa
+
+java -jar /PATH/dist/FrameBot.jar framebot -o nifH_test nifH_test.index example/nifH_test_query.fa
+
+3. Building index for metric indexed search 
 This step builds an index file based on the input DNA sequences using global pairwise alignment mode. The parameters and metric scoring matrix are also stored in the index file. The reference DNA sequences should cover the exact same protein-coding region. 
 
 usage: FramebotIndex [options] <nucl seed file> <out index file>
@@ -51,47 +95,7 @@ One DNA reference fasta file, and output index file are required.
 [Example command from a terminal]
 java -jar /PATH/dist/FrameBot.jar index example/nifH_test_refseq_nucl.fa nifH_test.index
 
-
-3. Frameshift correction and nearest neighbor assignment
-The is the main step to run frameshift correction. It produces frameshift-corrected protein and DNA sequences and an optimal global or local protein alignment. The nearest matching sequences in the pairwise alignment can be used as the nearest neighbor assignment. Any query sequence that does not satisfy the minimum length and protein identity is considered as non-target read and put in the failed output files. 
-
-usage: FramebotMain [options] <seed or index file> <query file>
-
-[Required]
-One protein reference fasta file or index file, and one DNA query fasta file are required. 
-
-[Options]
- -a,--alignment-mode <arg>       Alignment mode: glocal, local or global (default = glocal)
- -e,--gap-ext-penalty <arg>      gap extension penalty for no-metric-search ONLY. Default is -1
- -f,--frameshift-penalty <arg>   frameshift penalty for no-metric-search ONLY. Default is -10
- -g,--gap-open-penalty <arg>     gap opening penalty for no-metric-search ONLY. Default is -10
- -i,--identity-cutoff <arg>      Percent identity cutoff [0-1] (default = .4)
- -l,--length-cutoff <arg>        Length cutoff in number of amino acids (default = 80)
- -m,--max-radius <arg>           maximum radius for metric-search ONLY, range [1-2147483647], default uses the maxRadius
-                                 specified in the index file
- -N,--no-metric-search           Disable metric search (provide fasta file of seeds instead of index file)
- -o,--result-stem <arg>          Result file name stem (default=stem of query nucl file)
- -q,--quality-file <arg>         Sequence quality data
- -t,--transl-table <arg>         Protein translation table to use (integer based on ncbi's translation tables,
-                                 default=11 bacteria/archaea)
- -x,--scoring-matrix <arg>       the protein scoring matrix for no-metric-search ONLY. Default is Blosum62
-
-[Note]
-The metric indexed search uses global alignment mode and the parameters embedded in the index file. 
-This step produces six output files:
-_framebot.txt - the alignment to the nearest match satisfying the minimum length and protein identity cutoff.
-_nucl_corr.fasta and all_seqs_derep_prot_corr.fasta - the frameshift-corrected nucleotide and protein sequences satisfying the minimum length and protein identity cutoff. 
-_failed_framebot.txt - the alignment to the nearest match that failed the minimum length and protein identity cutoff.
-_nucl_failed.fasta - fasta file containing the nucleotide sequences that failed the minimum length and protein identity cutoff.
-
-
-[Example command from a terminal]
-java -jar /PATH/dist/FrameBot.jar framebot -N -o nifH_test example/nifH_test_refseq_prot.fa example/nifH_test_query.fa
-
-java -jar /PATH/dist/FrameBot.jar framebot -o nifH_test nifH_test.index example/nifH_test_query.fa
-
-
-3. Convert FrameBot outputs to different output formats
+4. Convert FrameBot outputs to different output formats
 The output _framebot.txt file contains the detailed pairwise protein alignment for each sequence. This tool generates a few type of statistics outputs that can be useful as input for third party tools, or spotting problems in the query or reference set. For example, the matrix output is equivalent to a data matrix that can be used in R ordination analysis (see FrameBot publication). IF the hist output showes large portion of query sequences shared less than 50% to the reference sequences, it indicates a broader reference set is needed.
 
 usage: GetFrameBotStatMain [options] <FrameBot Alignment file or Dir> <out file>
@@ -119,7 +123,7 @@ One FrameBot pairwise alignment file or a directory and an output file are requi
 java -jar /PATH/dist/FrameBot.jar stat -t matrix -i example/ids.txt -s example/samples.txt nifH_test_framebot.txt  nifH_test_stat.txt
 
 
-4. Miscellaneous help tool -- random sequence selection
+5. Miscellaneous help tool -- random sequence selection
 This tool randomly selects a subset of sequence IDs from the sample Mapping file, same number of sequences for each sample. Can specify the number of sequences to be selected, or by default select the smallest size of all the samples. The resulting subset sampleMapping file can then be used by GetFrameBotStatMain to generate a data matrix for R analysis.
 
 usage: RdmSelectSampleMapping [options] <sampleMapping> <outfile>

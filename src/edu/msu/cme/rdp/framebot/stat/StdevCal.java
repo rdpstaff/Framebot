@@ -8,7 +8,7 @@ import java.util.ArrayList;
  * @author wangqion
  */
 public class StdevCal {
-    static class Std{
+    public static class Std{
         private double totalCount;
         private double mean;
         private double stdev;
@@ -62,7 +62,7 @@ public class StdevCal {
         valList.add(14.0);
         valList.add(15.0);
         Std result = StdevCal.calStd(valList);
-        System.err.println("totalCoun= " + result.totalCount + " mean= " + result.mean + " std=" + result.stdev);
+        System.err.println("totalCount= " + result.totalCount + " mean= " + result.mean + " std=" + result.stdev);
     }
 
 }
