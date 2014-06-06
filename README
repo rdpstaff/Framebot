@@ -9,7 +9,7 @@ Contact: Qiong Wang at wangqion@msu.edu, RDP Staff at rdpstaff@msu.edu
 RDP FrameBot is a frameshift correction and nearest neighbor classification tool for use with high-throughput amplicon sequencing. It uses a dynamic programming algorithm to align each query DNA sequence against a set of target protein sequences, produces frameshift-corrected protein and DNA sequences and an optimal global or local protein alignment. It also helps filter out non-target reads. The online version of FrameBot is available on http://fungene.cme.msu.edu/FunGenePipeline. Read the quick tutorial at http://rdp.cme.msu.edu/tutorials/framebot/RDPtutorial_FRAMEBOT.html before you start. 
 
 CITATION:
-Wang, Q., Quensen, J. F., Fish, J. A., Lee, T. K., Sun, Y., Tiedje, J. M., and Cole, J. R. 2013. Ecological patterns of nifH genes in four terrestrial climatic zones explored with targeted metagenomics using FrameBot, a new informatics tool. mBio., in press. 
+Wang, Q., Quensen, J. F., Fish, J. A., Lee, T. K., Sun, Y., Tiedje, J. M., and Cole, J. R. 2013. Ecological patterns of nifH genes in four terrestrial climatic zones explored with targeted metagenomics using FrameBot, a new informatics tool. mBio 4:e00592-13; doi: 10.1128/mBio.00592-13. 
 
 Copyright 2012 Ribosomal Database Project
 This project is distributed under the terms of the GNU GPLv3
