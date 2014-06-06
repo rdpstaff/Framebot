@@ -2,7 +2,6 @@ package edu.msu.cme.rdp.framebot.cli;
 
 import edu.msu.cme.rdp.alignment.AlignmentMode;
 import edu.msu.cme.rdp.alignment.pairwise.ScoringMatrix;
-import edu.msu.cme.rdp.framebot.core.ProteinSeqMatch;
 import edu.msu.cme.rdp.framebot.core.FramebotCore;
 import edu.msu.cme.rdp.framebot.core.FramebotResult;
 import edu.msu.cme.rdp.framebot.index.FramebotIndex;
@@ -17,6 +16,7 @@ import edu.msu.cme.rdp.readseq.readers.SeqReader;
 import edu.msu.cme.rdp.readseq.readers.Sequence;
 import edu.msu.cme.rdp.readseq.utils.IUBUtilities;
 import edu.msu.cme.rdp.readseq.utils.SeqUtils;
+import edu.msu.cme.rdp.readseq.utils.kmermatch.ProteinSeqMatch;
 import edu.msu.cme.rdp.readseq.utils.orientation.ProteinWordGenerator;
 import java.io.FileInputStream;
 import java.util.ArrayList;

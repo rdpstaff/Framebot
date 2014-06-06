@@ -17,6 +17,7 @@
 
 package edu.msu.cme.rdp.framebot.stat;
 
+import edu.msu.cme.rdp.readseq.stat.StdevCal;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;

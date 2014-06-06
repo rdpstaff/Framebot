@@ -5,6 +5,7 @@
 
 package edu.msu.cme.rdp.framebot.stat;
 
+import edu.msu.cme.rdp.readseq.stat.StdevCal;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
