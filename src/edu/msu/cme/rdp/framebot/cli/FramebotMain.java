@@ -45,8 +45,7 @@ public class FramebotMain {
         
         options.addOption("t", "transl-table", true, "Protein translation table to use (integer based on ncbi's translation tables, default=11 bacteria/archaea)");
         options.addOption("w", "word-size", true, "The word size used to find closest protein targets. (default = " + ProteinWordGenerator.WORDSIZE + ", recommended range [3 - 6])");
-        options.addOption("k", "knn", true, "The top k closest protein targets. (default = 10)");
-        options.addOption("P", "no-prefilter", false, "Disable the pre-filtering step for non-metric search.");
+        options.addOption("k", "knn", true, "The top k closest targets from kmer prefilter step. Set k=0 to disable this step. (default = 10)");
     }
 
     private static void framebotItUp(List<Sequence> targetSeqs, File queryFile, File qualFile, OutputCoordinator outputCoordinator, AlignmentMode mode, ScoringMatrix simMatrix, int translTable) throws IOException {
@@ -88,7 +87,6 @@ public class FramebotMain {
 
             outputCoordinator.printResult(bestResult, seq, bestIsReversed);
 
-            System.out.println("Processed " + seq.getSeqName() + " in " + (System.currentTimeMillis() - startTime) + " ms");
             seqCount++;
         }
 
@@ -128,6 +126,9 @@ public class FramebotMain {
             boolean bestIsReversed = true;
             
             long startTime = System.currentTimeMillis();
+            
+            //check if the abudance above threshold
+            theObj.addRefSeq(seq);
             ArrayList<ProteinSeqMatch.BestMatch> topKMatches= theObj.findTopKMatch(seq, k);
              
             for (ProteinSeqMatch.BestMatch bestTarget : topKMatches) {
@@ -147,7 +148,6 @@ public class FramebotMain {
 
             outputCoordinator.printResult(bestResult, seq, bestIsReversed);
 
-            System.out.println("Processed " + seq.getSeqName() + " in " + (System.currentTimeMillis() - startTime) + " ms");
             seqCount++;
         }
 
@@ -202,7 +202,6 @@ public class FramebotMain {
         double identityCutoff = .4;
         String outputStem = null;
         boolean metricSearch = true;
-        boolean usePrefilter = true;
         int maxRadius = 0;
         int translTable = 11;
         int wordSize = ProteinWordGenerator.WORDSIZE;
@@ -241,9 +240,7 @@ public class FramebotMain {
             if (line.hasOption("no-metric-search")) {
                 metricSearch = false;
             }
-            if (line.hasOption("no-prefilter")) {
-                usePrefilter = false;
-            }
+           
             if (line.hasOption("scoring-matrix")) {
                 scoringMatrixFile = new File(line.getOptionValue("scoring-matrix"));
             }
@@ -291,8 +288,9 @@ public class FramebotMain {
             }
             if (line.hasOption("knn")) {
                 k = Integer.parseInt(line.getOptionValue("knn"));
-                if ( k < 1 ){
-                    throw new Exception("knn must be at least 1");
+                // if k==0 means no prfilter
+                if ( k < 0 ){
+                    throw new Exception("knn must be at least 0. Prefilter step find the top k closest targets based on kmer matching. Set k=0 to disable the kmer prefilter step");
                 }
             }
 
@@ -377,7 +375,7 @@ public class FramebotMain {
                 }else {
                     scoringMatrix = ScoringMatrix.getDefaultProteinMatrix();
                 }
-                if ( usePrefilter){
+                if ( k > 0){
                      FramebotMain.framebotItUp_prefilter(targetSeqs, queryFile, qualFile, outputCoordinator, mode, scoringMatrix, translTable, wordSize, k);
                 } else {
                     FramebotMain.framebotItUp(targetSeqs, queryFile, qualFile, outputCoordinator, mode, scoringMatrix, translTable);
