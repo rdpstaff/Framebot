@@ -20,6 +20,7 @@ package edu.msu.cme.rdp.framebot.cli;
 import edu.msu.cme.rdp.framebot.index.FramebotIndex;
 import edu.msu.cme.rdp.framebot.stat.GetFrameBotStatMain;
 import edu.msu.cme.rdp.framebot.stat.RdmSelectSampleMapping;
+import edu.msu.cme.rdp.framebot.stat.TaxonAbundance;
 import java.util.Arrays;
 
 /**
@@ -33,6 +34,7 @@ public class Main {
                 "\n\tframebot      - run framebot" +
                 "\n\tindex         - build an index" +
                 "\n\tstat          - convert framebot output files to different output formats" +
+                "\n\ttaxonAbund    - taxonomic abundance group by phylum or match" +
                 "\n\trdmselect     - randomly selects a subset of sequence IDs from the sample Mapping file" +
                 "\n\ttranslate     - translate nucleotide sequences to protein (no frameshift correction) " +
                 "\n\tall-translate - translate nucleotide sequences to protein, all reading frames (no frameshift correction)";
@@ -56,7 +58,9 @@ public class Main {
             GetFrameBotStatMain.main(newArgs);
         } else if(cmd.equals("rdmselect")) {
             RdmSelectSampleMapping.main(newArgs);
-        } else {
+        } else if(cmd.equals("taxonAbund")) {
+            TaxonAbundance.main(newArgs);
+        }else {
             System.err.println("ERROR: " + "wrong subcommand");
             System.err.println(usage);
             return;

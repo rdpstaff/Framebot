@@ -4,6 +4,10 @@
  */
 package edu.msu.cme.rdp.framebot.stat;
 
+import edu.msu.cme.rdp.readseq.SequenceFormat;
+import edu.msu.cme.rdp.readseq.readers.Sequence;
+import edu.msu.cme.rdp.readseq.readers.SequenceReader;
+import edu.msu.cme.rdp.readseq.utils.SeqUtils;
 import java.io.*;
 import java.util.*;
 import org.apache.commons.cli.*;
@@ -25,7 +29,7 @@ public class GetFrameBotStatMain {
     private static final String ID_MAPPING_LONG_OPT = "id-mapping";
     private static final String SAMPLE_MAPPING_LONG_OPT = "sample-mapping";
     private static final String STAT_LONG_OPT = "stat-type";
-    private static final String DESCRIPTION_LONG_OPT = "subject-description";
+    private static final String DESCRIPTION_LONG_OPT = "seq-desc";
     private static final String IDENTITY_LONG_OPT = "identity";
     
    
@@ -44,7 +48,7 @@ public class GetFrameBotStatMain {
         options.addOption(new Option(ID_MAPPING_SHORT_OPT, ID_MAPPING_LONG_OPT, true, "Id mapping file. Output from Dereplicator (http://fungene.cme.msu.edu/FunGenePipeline/derep/form.spr)."));
         options.addOption(new Option(SAMPLE_MAPPING_SHORT_OPT, SAMPLE_MAPPING_LONG_OPT, true, "Sample mapping file. Output from Dereplicator (http://fungene.cme.msu.edu/FunGenePipeline/derep/form.spr)."));
         options.addOption(new Option(STAT_SHORT_OPT, STAT_LONG_OPT, true, STAT_DESC));
-        options.addOption(new Option(DESCRIPTION_SHORT_OPT, DESCRIPTION_LONG_OPT, true, "the description of the reference seq, tab-delimited file"));
+        options.addOption(new Option(DESCRIPTION_SHORT_OPT, DESCRIPTION_LONG_OPT, true, "the description of the reference seq, tab-delimited file or fasta"));
         options.addOption(new Option(IDENTITY_SHORT_OPT, IDENTITY_LONG_OPT, true, "the minimum protein identity, default is 0, range [0-100]"));
     }
 
@@ -72,15 +76,25 @@ public class GetFrameBotStatMain {
         }
     }
 
-    public static HashMap<String, String> readDesc(String DescFile) throws IOException{
+    public static HashMap<String, String> readDesc(File descFile) throws IOException{
         HashMap<String, String> descMap = new HashMap<String, String>();
-        BufferedReader reader = new BufferedReader(new FileReader(new File(DescFile)));
-        String line = null;
-        while ((line=reader.readLine()) != null){
-            String[] values = line.split("\\t");
-            descMap.put(values[0], values[1]);
+        SequenceFormat format = SeqUtils.guessFileFormat(descFile);
+        if ( format == SequenceFormat.UNKNOWN){
+            BufferedReader reader = new BufferedReader(new FileReader(descFile));
+            String line = null;
+            while ((line=reader.readLine()) != null){
+                String[] values = line.split("\\t");
+                descMap.put(values[0], values[1]);
+            }
+            reader.close();
+        }else {
+            SequenceReader reader = new SequenceReader(descFile);       
+            Sequence seq ;
+            while ( (seq = reader.readNextSequence()) !=  null) {
+                descMap.put( seq.getSeqName(), seq.getDesc());
+            }
+            reader.close();
         }
-        reader.close();
         return descMap;
     }
 
@@ -348,7 +362,7 @@ public class GetFrameBotStatMain {
             } 
             if (line.hasOption(DESCRIPTION_SHORT_OPT) ) {
                 descFile = line.getOptionValue(DESCRIPTION_SHORT_OPT);
-                descMap = readDesc(descFile);
+                descMap = readDesc(new File(descFile));
             } 
             if (line.hasOption(IDENTITY_SHORT_OPT) ) {
                 identity = Double.parseDouble(line.getOptionValue(IDENTITY_SHORT_OPT));
