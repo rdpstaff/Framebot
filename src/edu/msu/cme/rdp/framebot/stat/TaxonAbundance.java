@@ -39,6 +39,7 @@ public class TaxonAbundance {
     static {
         options.addOption(new Option("c", "seqCoverage", true, "contains the ID and coverage separated by space or tab." +
                " Used to adjust the sequence abundance"));
+        options.addOption(new Option("e", "identity", true, "the minimum protein identity, default is 0, range [0-100]"));
     }
     
     public static HashMap<String, Double> parseKmerCoverage(String infile) throws IOException{
@@ -55,7 +56,7 @@ public class TaxonAbundance {
     }
     
     
-    public static void mapAbundance( File framebotResult, File lineagefile, String outfile, HashMap<String, Double> coveragetMap ) throws IOException{
+    public static void mapAbundance( File framebotResult, File lineagefile, String outfile, HashMap<String, Double> coveragetMap, double identity) throws IOException{
         HashMap<String,String> lineageMap = GetFrameBotStatMain.readDesc(lineagefile);
         HashMap<String, Double> rankMatchMap = new HashMap<String, Double>(); // taxon rank, 
         HashMap<String, Double> matchMap = new HashMap<String, Double>();  // match name
@@ -75,6 +76,11 @@ public class TaxonAbundance {
             while ( (line = reader.readLine() )!= null) {
                 if ( !line.startsWith("STAT")) continue;
                 String[] tokens = line.trim().split("\\t");
+                double thisIdentity = Double.parseDouble(tokens[5]);
+                if ( thisIdentity < identity) {
+                    continue;
+                }
+                
                 String match = tokens[1];
 
                 String[] lineage = lineageMap.get(match).split(";");
@@ -137,12 +143,20 @@ public class TaxonAbundance {
      */
     public static void main (String[] args) throws Exception {
         HashMap<String, Double> coveragetMap = null;
+        double identity = 0.0;
         try {
             CommandLine line = new PosixParser().parse(options, args);
             if (line.hasOption("seqCoverage") ) {
                 String coveragefile = line.getOptionValue("seqCoverage");   
                 coveragetMap = parseKmerCoverage(coveragefile);
             }
+            if (line.hasOption("identity") ) {
+                identity = Double.parseDouble(line.getOptionValue("identity"));
+                if ( identity < 0 || identity > 100) {
+                     throw new IllegalArgumentException("identity cutoff should be in the range of 0 and 100");
+                }
+            } 
+                 
             args = line.getArgs();
             if (args.length != 3) {
                 throw new Exception("");
@@ -156,7 +170,7 @@ public class TaxonAbundance {
                     + "\noutfile: output with the nearest match count group by phylum/class; and by match name"
             );
         }
-        TaxonAbundance.mapAbundance(new File(args[0]), new File(args[1]), args[2], coveragetMap);
+        TaxonAbundance.mapAbundance(new File(args[0]), new File(args[1]), args[2], coveragetMap, identity);
     }
      
 }
