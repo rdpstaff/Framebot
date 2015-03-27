@@ -32,6 +32,10 @@ public class OutputCoordinator {
         this(lengthCutoff, identityCutoff, framebotOutputFile, failedFramebotOutputFile, correctedProtOutputFile, correctedNuclOutputFile, null, failedNuclOutputFile);
     }
 
+    public double getIdentityCutoff(){
+        return identityCutoff;
+    }
+    
     public OutputCoordinator(int lengthCutoff, double identityCutoff, File framebotOutputFile, File failedFramebotOutputFile, File correctedProtOutputFile, File correctedNuclOutputFile, File correctedNuclQualOut, File failedNuclOutputFile) throws IOException {
         this.lengthCutoff = lengthCutoff;
         this.identityCutoff = identityCutoff;

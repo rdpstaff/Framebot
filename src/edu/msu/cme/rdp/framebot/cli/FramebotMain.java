@@ -1,9 +1,15 @@
 package edu.msu.cme.rdp.framebot.cli;
 
 import edu.msu.cme.rdp.alignment.AlignmentMode;
+import edu.msu.cme.rdp.alignment.pairwise.PairwiseAligner;
+import edu.msu.cme.rdp.alignment.pairwise.PairwiseAlignment;
 import edu.msu.cme.rdp.alignment.pairwise.ScoringMatrix;
+import edu.msu.cme.rdp.alignment.pairwise.rna.DistanceModel;
+import edu.msu.cme.rdp.alignment.pairwise.rna.IdentityDistanceModel;
+import edu.msu.cme.rdp.alignment.pairwise.rna.OverlapCheckFailedException;
 import edu.msu.cme.rdp.framebot.core.FramebotCore;
 import edu.msu.cme.rdp.framebot.core.FramebotResult;
+import edu.msu.cme.rdp.framebot.core.FramebotScoringMatrix;
 import edu.msu.cme.rdp.framebot.index.FramebotIndex;
 import edu.msu.cme.rdp.framebot.index.FramebotIndex.FramebotSearchResult;
 import edu.msu.cme.rdp.framebot.output.OutputCoordinator;
@@ -15,6 +21,7 @@ import edu.msu.cme.rdp.readseq.readers.SequenceReader;
 import edu.msu.cme.rdp.readseq.readers.SeqReader;
 import edu.msu.cme.rdp.readseq.readers.Sequence;
 import edu.msu.cme.rdp.readseq.utils.IUBUtilities;
+import edu.msu.cme.rdp.readseq.utils.ProteinUtils;
 import edu.msu.cme.rdp.readseq.utils.SeqUtils;
 import edu.msu.cme.rdp.readseq.utils.kmermatch.ProteinSeqMatch;
 import edu.msu.cme.rdp.readseq.utils.orientation.ProteinWordGenerator;
@@ -29,6 +36,13 @@ import org.apache.commons.cli.PosixParser;
 public class FramebotMain {
 
     private static final Options options = new Options();
+    private static final int DENOVO_ABUND_LIMIT = 10; // minimum size of unique seqs to be considered as abundant
+    private static final double DENOVO_ID_CUTOFF = 0.7;
+    private static int denovoAbundanceLimit = DENOVO_ABUND_LIMIT;  // minimum size of unique seqs to be considered as abundant
+    private static double denovoIdentityCutoff = DENOVO_ID_CUTOFF;
+    private static final ProteinUtils proteinUtils = ProteinUtils.getInstance();
+    private static final String delims = "[=;]";
+    private static DistanceModel dist = new IdentityDistanceModel();
 
     static {
         options.addOption("o", "result-stem", true, "Result file name stem (default=stem of query nucl file)");
@@ -46,9 +60,14 @@ public class FramebotMain {
         options.addOption("t", "transl-table", true, "Protein translation table to use (integer based on ncbi's translation tables, default=11 bacteria/archaea)");
         options.addOption("w", "word-size", true, "The word size used to find closest protein targets. (default = " + ProteinWordGenerator.WORDSIZE + ", recommended range [3 - 6])");
         options.addOption("k", "knn", true, "The top k closest targets from kmer prefilter step. Set k=0 to disable this step. (default = 10)");
+        
+        options.addOption("z", "de-novo", false, "Enable de novo mode to add abundant query seqs to refset. Only works for no-metric-search");
+        options.addOption("b", "denovo-abund-cutoff", true, "minimum abundance for de-novo mode. default = " + DENOVO_ABUND_LIMIT);
+        options.addOption("d", "denovo-id-cutoff", true, "maxmimum aa identity cutoff for query to be added to refset for de-novo mode. default = " + DENOVO_ID_CUTOFF);
     }
 
-    private static void framebotItUp(List<Sequence> targetSeqs, File queryFile, File qualFile, OutputCoordinator outputCoordinator, AlignmentMode mode, ScoringMatrix simMatrix, int translTable) throws IOException {
+    private static void framebotItUp(List<Sequence> targetSeqs, File queryFile, File qualFile, OutputCoordinator outputCoordinator, 
+            AlignmentMode mode, ScoringMatrix simMatrix, int translTable, boolean denovo) throws IOException, OverlapCheckFailedException {
         SeqReader queryReader;
 
         if(qualFile != null) {
@@ -85,8 +104,23 @@ public class FramebotMain {
                 }
             }
 
-            outputCoordinator.printResult(bestResult, seq, bestIsReversed);
-
+            if ( !denovo) {
+                outputCoordinator.printResult(bestResult, seq, bestIsReversed);
+            } else {
+                Sequence targetProSeq = new Sequence( bestResult.getAlignedTarget().getSeqName(), "", SeqUtils.getUnalignedSeqString(bestResult.getAlignedTarget().getSeqString()));
+                String protseqToadd = checkDenovo(seq, targetProSeq, bestResult, outputCoordinator, translTable);
+                if ( protseqToadd != null){ // we need to redo the frameshift calculation
+                    targetSeqs.add(new Sequence(seq.getSeqName(), "", protseqToadd));
+                    Sequence tempSeq = new Sequence(seq.getSeqName(), "", protseqToadd);
+                    if ( !bestIsReversed){
+                        bestResult = FramebotCore.processSequence(seq, tempSeq, true, translTable, mode, simMatrix);
+                    }else {
+                        bestResult = FramebotCore.processSequence(reverseComplement, tempSeq, true, translTable, mode, simMatrix);
+                    }
+                }
+                outputCoordinator.printResult(bestResult, seq, bestIsReversed);
+            }
+            
             seqCount++;
         }
 
@@ -105,8 +139,8 @@ public class FramebotMain {
      * @throws IOException 
      */
     private static void framebotItUp_prefilter(List<Sequence> targetSeqs, File queryFile, File qualFile, 
-            OutputCoordinator outputCoordinator, AlignmentMode mode, ScoringMatrix simMatrix, int translTable, int wordSize, int k) throws IOException {
-        SeqReader queryReader;
+            OutputCoordinator outputCoordinator, AlignmentMode mode, ScoringMatrix simMatrix, int translTable, int wordSize, int k, boolean denovo) throws IOException, OverlapCheckFailedException {
+        SeqReader queryReader = new SequenceReader(queryFile);
 
         if(qualFile != null) {
             queryReader = new QSeqReader(queryFile, qualFile);
@@ -115,23 +149,17 @@ public class FramebotMain {
         }
 
         Sequence seq;
-        int seqCount = 0;
-        long totalTime = System.currentTimeMillis();                
         ProteinSeqMatch theObj = new ProteinSeqMatch(targetSeqs, wordSize);            
 
         while ((seq = queryReader.readNextSequence()) != null) {
             Sequence reverseComplement = new Sequence(seq.getSeqName(), "", IUBUtilities.reverseComplement(seq.getSeqString()));
 
             FramebotResult bestResult = null;
-            boolean bestIsReversed = true;
-            
-            long startTime = System.currentTimeMillis();
-            
-            //check if the abudance above threshold
-            theObj.addRefSeq(seq);
+            boolean bestIsReversed = true;               
             ArrayList<ProteinSeqMatch.BestMatch> topKMatches= theObj.findTopKMatch(seq, k);
              
             for (ProteinSeqMatch.BestMatch bestTarget : topKMatches) {
+                
                 FramebotResult result;
                 if ( !bestTarget.isRevComp()){
                     result = FramebotCore.processSequence(seq, bestTarget.getBestMatch(), true, translTable, mode, simMatrix);
@@ -139,21 +167,98 @@ public class FramebotMain {
                     result = FramebotCore.processSequence(reverseComplement, bestTarget.getBestMatch(), true, translTable, mode, simMatrix);
                 }
 
-                //System.err.println(seq.getSeqName() + " target=" + bestTarget.getBestMatch().getSeqName() + " score=" + result.getFrameScore().getMaxScore());
                 if (bestResult == null || bestResult.getFrameScore().getMaxScore() < result.getFrameScore().getMaxScore()) {
                     bestResult = result;
                     bestIsReversed = bestTarget.isRevComp();
                 }
             }
 
-            outputCoordinator.printResult(bestResult, seq, bestIsReversed);
+            if ( !denovo) {
+                outputCoordinator.printResult(bestResult, seq, bestIsReversed);
+            } else {
+                Sequence targetProSeq = theObj.getRefSeq(bestResult.getAlignedTarget().getSeqName());
+                String protseqToadd = checkDenovo(seq, targetProSeq, bestResult, outputCoordinator, translTable);
+                if ( protseqToadd != null){ // we need to redo the frameshift calculation
+                    theObj.addRefSeq(new Sequence(seq.getSeqName(), "", protseqToadd));
+                    Sequence tempSeq = new Sequence(seq.getSeqName(), "", protseqToadd);
+                    if ( !bestIsReversed){
+                        bestResult = FramebotCore.processSequence(seq, tempSeq, true, translTable, mode, simMatrix);
+                    }else {
+                        bestResult = FramebotCore.processSequence(reverseComplement, tempSeq, true, translTable, mode, simMatrix);
+                    }
+                }
+                outputCoordinator.printResult(bestResult, seq, bestIsReversed);
+            }                
+        }
+    }
+    
 
-            seqCount++;
+    private static String checkDenovo( Sequence seq, Sequence targetProSeq, FramebotResult bestResult, 
+            OutputCoordinator outputCoordinator, int translTable )throws IOException, OverlapCheckFailedException { 
+        // we don't need to get more de novo refs if above certain pct Identity, or below the minmum cutoff
+        if ( bestResult.getPercentIdent() < outputCoordinator.getIdentityCutoff() || bestResult.getPercentIdent() >= denovoIdentityCutoff) { 
+            return null;
+        }  
+
+        //parsing description to get size,              
+        String[] elements = seq.getDesc().split(delims);
+        int size = Integer.parseInt(elements[elements.length - 1]);
+        //abundance check an dpctID check
+        if(size < denovoAbundanceLimit ){
+            return null;
         }
 
-        System.out.println("Processed " + seqCount + " sequences in " + (System.currentTimeMillis() - totalTime) + " ms");
+        Boolean addToRefSet = false;
+        String corr_prot_seqstring =  SeqUtils.getUnalignedSeqString(bestResult.getAlignedQuery().getSeqString());
+        String bestProSeq = corr_prot_seqstring;
+        if(bestResult.getFrameshifts() == 0){                    
+            //if do not contain stop codons
+            if(corr_prot_seqstring.indexOf('*') == -1){                
+                addToRefSet = true;
+            }                    
+        } else {
+            PairwiseAlignment upw = null;                    
+            double bestUpwIdent = 0.0;            
+            for (int i = 0; i < FramebotScoringMatrix.NUM_FRAMES; i++) {
+                String proSeqString = proteinUtils.translateToProtein(seq.getSeqString().substring(i), true, translTable);
+                if(proSeqString.indexOf('*') != -1){
+                    continue;
+                }
+
+                PairwiseAlignment temp_upw = PairwiseAligner.align(targetProSeq.getSeqString(), proSeqString, ScoringMatrix.getDefaultProteinMatrix(), AlignmentMode.glocal);
+                double ident = 1 - dist.getDistance(temp_upw.getAlignedSeqi().getBytes(), temp_upw.getAlignedSeqj().getBytes(), 0);
+                if(upw == null || ident > bestUpwIdent){
+                    upw = temp_upw;
+                    bestProSeq = proSeqString;
+                    bestUpwIdent = ident;
+                }
+            }
+            if(upw != null){                       
+                PairwiseAlignment cpw = PairwiseAligner.align(targetProSeq.getSeqString(), corr_prot_seqstring, ScoringMatrix.getDefaultProteinMatrix(), AlignmentMode.glocal);
+                double ident = 1 - dist.getDistance(cpw.getAlignedSeqi().getBytes(), cpw.getAlignedSeqj().getBytes(), 0);
+                if(bestUpwIdent > ident * 0.95){
+                    addToRefSet = true;                        
+                }
+            }
+        }    
+
+        if ( addToRefSet){
+            return bestProSeq;
+        }else {
+            return null;
+        }
+        
     }
 
+    /**
+     * This method should be obsolete now, replace by the pre-filter approach
+     * @param index
+     * @param maxRadius
+     * @param queryFile
+     * @param qualFile
+     * @param outputCoordinator
+     * @throws IOException 
+     */
     private static void framebotItUp(FramebotIndex index, int maxRadius, File queryFile, File qualFile, OutputCoordinator outputCoordinator) throws IOException {SeqReader queryReader;
 
         if(qualFile != null) {
@@ -194,7 +299,7 @@ public class FramebotMain {
         System.out.println("Processed " + seqCount + " sequences in " + (System.currentTimeMillis() - totalTime) + " ms");
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, OverlapCheckFailedException {
         File indexOrSeedFile = null;
         File queryFile = null;
         File qualFile = null;
@@ -212,6 +317,7 @@ public class FramebotMain {
         int gapExtend = ScoringMatrix.DEFAULT_GAP_EXT_PENALTY;
         int frameshiftPenalty = ScoringMatrix.DEFAULT_FRAME_SHIFT_PENALTY;
         boolean useDefaultMatrixParameter = true; 
+        boolean denovoMode = false;
         
 
         File framebotOutput;
@@ -240,7 +346,18 @@ public class FramebotMain {
             if (line.hasOption("no-metric-search")) {
                 metricSearch = false;
             }
-           
+            if (line.hasOption("denovo-abund-cutoff")) {
+                 denovoAbundanceLimit = Integer.parseInt(line.getOptionValue("denovo-abund-cutoff"));
+                 if ( denovoAbundanceLimit < 1){
+                     throw new Exception("abund-cutoff must be at least 1");
+                 }
+            }
+            if (line.hasOption("denovo-id-cutoff")) {
+                 denovoIdentityCutoff = Double.parseDouble(line.getOptionValue("denovo-id-cutoff"));
+                 if ( denovoIdentityCutoff < identityCutoff || denovoIdentityCutoff > 1){
+                     throw new Exception("denovo-id-cutoff should be between " + identityCutoff + " and 1.");
+                 }
+            }
             if (line.hasOption("scoring-matrix")) {
                 scoringMatrixFile = new File(line.getOptionValue("scoring-matrix"));
             }
@@ -292,6 +409,10 @@ public class FramebotMain {
                 if ( k < 0 ){
                     throw new Exception("knn must be at least 0. Prefilter step find the top k closest targets based on kmer matching. Set k=0 to disable the kmer prefilter step");
                 }
+            }
+            
+            if (line.hasOption("de-novo")) {
+                denovoMode = true;
             }
 
             args = line.getArgs();
@@ -376,9 +497,9 @@ public class FramebotMain {
                     scoringMatrix = ScoringMatrix.getDefaultProteinMatrix();
                 }
                 if ( k > 0){
-                     FramebotMain.framebotItUp_prefilter(targetSeqs, queryFile, qualFile, outputCoordinator, mode, scoringMatrix, translTable, wordSize, k);
+                     FramebotMain.framebotItUp_prefilter(targetSeqs, queryFile, qualFile, outputCoordinator, mode, scoringMatrix, translTable, wordSize, k, denovoMode);
                 } else {
-                    FramebotMain.framebotItUp(targetSeqs, queryFile, qualFile, outputCoordinator, mode, scoringMatrix, translTable);
+                    FramebotMain.framebotItUp(targetSeqs, queryFile, qualFile, outputCoordinator, mode, scoringMatrix, translTable, denovoMode);
                 }
                 
             }
