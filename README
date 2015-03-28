@@ -66,15 +66,15 @@ _failed_framebot.txt - the alignment to the nearest match that failed the minimu
 _nucl_failed.fasta - fasta file containing the nucleotide sequences that failed the minimum length and protein identity cutoff.
 
 [Example command from a terminal]
-java -jar /PATH/dist/FrameBot.jar framebot -o nifH_test nifH_test.index example/nifH_test_query.fa
+java -jar /PATH/FrameBot.jar framebot -o nifH_test nifH_test.index example/nifH_test_query.fa
 
 [Note]
 FrameBot uses a kmer pre-filtering heuristic for no-metric-search. This pre-filtering may increase the speed by one to two orders of magnitude. Using this heuristic may cause FrameBot to return a different equally high-scoring (or occasionally almost as high) reference sequence. Pre-filtering is the default setting. Use option "-P" to disable the pre-filtering if necessary. 
 
 The option "Add de novo References" may help with genes with high diversity or lack of closely related reference sequences in the reference set (such as biphenyl dioxygenase). The de novo strategy came from Dr. Ondrej Uhlík group at Institute of Chemical Technology Prague. This is based on the assumption that abundant sequences are more likely to be correct. The experimental sequences are dereplicated and sorted by abundance in descending order first. Each query is tested against the reference set. If a query doesn't have a close reference with above 70% aa identity, the corresponding protein sequence of the query will be added to the reference set if the following criteria are met:
-Length Cutoff and Identity Cutoff.
-The abundance is above certain cutoff, default is 10
-No frameshifts or stop codon present.
+  1. Length Cutoff and Identity Cutoff.
+  2. The abundance is above certain cutoff, default is 10
+  3. No frameshifts or stop codon present.
 
 [To run FrameBot using the de novo strategy, use the following commands from a terminal]
 java -jar /PATH/Clustering.jar derep --sorted -o all_seqs_derep.fasta all_seqs.ids all_seqs.samples query_nucl.fasta 
