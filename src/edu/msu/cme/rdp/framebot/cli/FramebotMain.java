@@ -233,12 +233,8 @@ public class FramebotMain {
                     bestUpwIdent = ident;
                 }
             }
-            if(upw != null){                       
-                PairwiseAlignment cpw = PairwiseAligner.align(targetProSeq.getSeqString(), corr_prot_seqstring, ScoringMatrix.getDefaultProteinMatrix(), AlignmentMode.glocal);
-                double ident = 1 - dist.getDistance(cpw.getAlignedSeqi().getBytes(), cpw.getAlignedSeqj().getBytes(), 0);
-                if(bestUpwIdent > ident * 0.95){
-                    addToRefSet = true;                        
-                }
+            if(upw != null){   
+                addToRefSet = true;                                   
             }
         }    
 
