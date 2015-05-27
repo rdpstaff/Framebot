@@ -1,6 +1,6 @@
 FrameBot 
-version 1.0
-Last Update Date: 08/27/2013
+version 1.2
+Last Update Date: 03/28/2015
 Contact: Qiong Wang at wangqion@msu.edu, RDP Staff at rdpstaff@msu.edu
 
 -----------------------
@@ -39,6 +39,8 @@ One protein reference fasta file or index file, and one DNA query fasta file are
 
 [Options]
  -a,--alignment-mode <arg>       Alignment mode: glocal, local or global (default = glocal)
+ -b,--denovo-abund-cutoff <arg>  minimum abundance for de-novo mode. default = 10
+ -d,--denovo-id-cutoff <arg>     maxmimum aa identity cutoff for de-novo mode. default = 0.7
  -e,--gap-ext-penalty <arg>      gap extension penalty for no-metric-search ONLY. Default is -1
  -f,--frameshift-penalty <arg>   frameshift penalty for no-metric-search ONLY. Default is -10
  -g,--gap-open-penalty <arg>     gap opening penalty for no-metric-search ONLY. Default is -10
@@ -55,24 +57,33 @@ One protein reference fasta file or index file, and one DNA query fasta file are
                                  default=11 bacteria/archaea)
  -w,--word-size <arg>            The word size used to find closest protein targets. (default = 4, recommended range [3 - 6])
  -x,--scoring-matrix <arg>       the protein scoring matrix for no-metric-search ONLY. Default is Blosum62
+ -z,--de-novo                    Enable de novo mode to add abundant query seqs to refset
 
-
-[Note]
-FrameBot uses a kmer pre-filtering heuristic for no-metric-search. This pre-filtering may increase the speed by one to two orders of magnitude.
-Using this heuristic may cause FrameBot to return a different equally high-scoring (or occasionally almost as high) reference sequence. 
-Use option "-P" to disable the pre-filtering if necessary. To use metric-search, see step 3. 
- 
-This step produces six output files:
+The framebot step produces six output files:
 _framebot.txt - the alignment to the nearest match satisfying the minimum length and protein identity cutoff.
-_nucl_corr.fasta and all_seqs_derep_prot_corr.fasta - the frameshift-corrected nucleotide and protein sequences satisfying the minimum length and protein identity cutoff. 
+_nucl_corr.fasta and all_seqs_derep_prot_corr.fasta - the frameshift-corrected nucleotide and protein sequences satisfying the minimum length and protein identity cutoff.
 _failed_framebot.txt - the alignment to the nearest match that failed the minimum length and protein identity cutoff.
 _nucl_failed.fasta - fasta file containing the nucleotide sequences that failed the minimum length and protein identity cutoff.
 
-
 [Example command from a terminal]
-java -jar /PATH/dist/FrameBot.jar framebot -N -o nifH_test example/nifH_test_refseq_prot.fa example/nifH_test_query.fa
+java -jar /PATH/FrameBot.jar framebot -o nifH_test nifH_test.index example/nifH_test_query.fa
 
-java -jar /PATH/dist/FrameBot.jar framebot -o nifH_test nifH_test.index example/nifH_test_query.fa
+[Note]
+FrameBot uses a kmer pre-filtering heuristic for no-metric-search. This pre-filtering may increase the speed by one to two orders of magnitude. Using this heuristic may cause FrameBot to return a different equally high-scoring (or occasionally almost as high) reference sequence. Pre-filtering is the default setting. Use option "-P" to disable the pre-filtering if necessary. 
+
+The option "Add de novo References" may help with genes with high diversity or lack of closely related reference sequences in the reference set (such as biphenyl dioxygenase). The de novo strategy was designed by Michal Strejcek from Dr. Ondrej Uhlík group at Institute of Chemical Technology Prague. This is based on the assumption that abundant sequences are more likely to be correct. The experimental sequences are dereplicated and sorted by abundance in descending order first. Each query is tested against the reference set. If a query doesn't have a close reference with above 70% aa identity, the corresponding protein sequence of the query will be added to the reference set if the following criteria are met:
+  1. Length Cutoff and Identity Cutoff.
+  2. The abundance is above certain cutoff, default is 10
+  3. No frameshifts or stop codon present.
+
+[To run FrameBot using the de novo strategy, use the following commands from a terminal]
+java -jar /PATH/Clustering.jar derep --sorted -o all_seqs_derep.fasta all_seqs.ids all_seqs.samples query_nucl.fasta 
+java -jar /PATH/FrameBot.jar framebot -N -o bpha --de-novo bpha_ref.fasta all_seqs_derep.fasta 
+mkdir filtered_mapping
+java -jar /PATH/Clustering.jar refresh-mappings bpha_corr_prot.fasta all_seqs.ids all_seqs.samples filtered_mapping/filtered_ids.txt filtered_mapping/filtered_samples.txt
+mkdir filtered_sequences
+java -jar /PATH/Clustering.jar explode-mappings -w -o filtered_sequences filtered_mapping/filtered_ids.txt filtered_mapping/filtered_samples.txt bpha_corr_prot.fasta
+ 
 
 3. Building index for metric indexed search 
 This step builds an index file based on the input DNA sequences using global pairwise alignment mode. The parameters and metric scoring matrix are also stored in the index file. The reference DNA sequences should cover the exact same protein-coding region. 
@@ -94,6 +105,7 @@ One DNA reference fasta file, and output index file are required.
 
 [Example command from a terminal]
 java -jar /PATH/dist/FrameBot.jar index example/nifH_test_refseq_nucl.fa nifH_test.index
+
 
 4. Convert FrameBot outputs to different output formats
 The output _framebot.txt file contains the detailed pairwise protein alignment for each sequence. This tool generates a few type of statistics outputs that can be useful as input for third party tools, or spotting problems in the query or reference set. For example, the matrix output is equivalent to a data matrix that can be used in R ordination analysis (see FrameBot publication). IF the hist output showes large portion of query sequences shared less than 50% to the reference sequences, it indicates a broader reference set is needed.
