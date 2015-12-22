@@ -30,6 +30,7 @@ import java.io.OutputStream;
 import java.io.PrintStream;
 import java.text.DecimalFormat;
 import org.apache.commons.lang.StringUtils;
+import java.util.Locale;
 
 /**
  *
@@ -38,7 +39,10 @@ import org.apache.commons.lang.StringUtils;
 public class FramebotGenewiseOutput {
 
     private static final int printWidth = 60;
-    private static final DecimalFormat format = new DecimalFormat("0.000");
+    private static final DecimalFormat format = (DecimalFormat)DecimalFormat.getInstance(Locale.ENGLISH);
+    static {
+        format.applyPattern("0.000");
+    }
 
     private PrintStream out;
 
